@@ -1,0 +1,38 @@
+# 系统整体架构图
+
+## 架构图（图片版本）
+![系统整体架构图](system_architecture.png)
+
+## 架构图（Mermaid 版本）
+```mermaid
+graph TB
+    subgraph 用户层
+        A[Web前端] --> B[API网关]
+        C[移动端APP] --> B
+    end
+
+    subgraph 应用层
+        B --> D[认证服务]
+        B --> E[题目处理服务]
+        B --> F[视频生成服务]
+    end
+
+    subgraph 核心服务
+        E --> G[DeepSeek LLM]
+        E --> H[EchoMimicV2]
+        F --> I[FFmpeg]
+    end
+
+    subgraph 数据层
+        J[(PostgreSQL)]
+        K[(Redis)]
+        L[(RabbitMQ)]
+        M[对象存储]
+    end
+
+    D --> J
+    E --> J
+    E --> K
+    F --> L
+    F --> M
+``` 
