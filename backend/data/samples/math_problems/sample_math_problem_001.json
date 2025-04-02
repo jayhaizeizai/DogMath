@@ -1,0 +1,217 @@
+{
+  "metadata": {
+    "problem_id": "CIRCLE_CHORD_001",
+    "source_image": "sample_math_problem_001.jpeg",
+    "difficulty": "medium",
+    "estimated_duration": 280,
+    "knowledge_tags": ["圆的性质", "勾股定理", "垂直半径定理"],
+    "created_at": "2024-04-01T00:00:00Z"
+  },
+  "blackboard": {
+    "background": "classic_blackboard",
+    "resolution": [1920, 1080],
+    "steps": [
+      {
+        "step_id": 1,
+        "title": "题目解析",
+        "duration": 25,
+        "elements": [
+          {
+            "type": "geometry",
+            "content": "M0 0 L100 0 A50 50 0 0 1 100 100 L0 100 Z",
+            "position": [50, 40],
+            "font_size": 32,
+            "animation": {
+              "enter": "draw_path",
+              "exit": "fade_out",
+              "duration": 8
+            }
+          },
+          {
+            "type": "text",
+            "content": "已知条件：",
+            "position": [10, 10],
+            "font_size": 28,
+            "animation": {
+              "enter": "fade_in",
+              "exit": "fade_out",
+              "duration": 1
+            }
+          },
+          {
+            "type": "formula",
+            "content": "OA=5,\\quad OD=3",
+            "position": [15, 20],
+            "font_size": 32,
+            "animation": {
+              "enter": "slide_in_left",
+              "exit": "fade_out",
+              "duration": 1
+            }
+          }
+        ]
+      },
+      {
+        "step_id": 2,
+        "title": "构建直角三角形",
+        "duration": 40,
+        "elements": [
+          {
+            "type": "formula",
+            "content": "\\triangle OAD",
+            "position": [30, 50],
+            "font_size": 32,
+            "animation": {
+              "enter": "highlight",
+              "exit": "fade_out",
+              "duration": 1
+            }
+          },
+          {
+            "type": "text",
+            "content": "关键定理：",
+            "position": [65, 30],
+            "font_size": 24,
+            "animation": {
+              "enter": "fade_in",
+              "exit": "fade_out",
+              "duration": 1
+            }
+          },
+          {
+            "type": "formula",
+            "content": "OA^2 = OD^2 + AD^2",
+            "position": [65, 40],
+            "font_size": 32,
+            "animation": {
+              "enter": "slide_in_left",
+              "exit": "fade_out",
+              "duration": 1
+            }
+          }
+        ]
+      },
+      {
+        "step_id": 3,
+        "title": "代入计算",
+        "duration": 60,
+        "elements": [
+          {
+            "type": "formula",
+            "content": "5^2 = 3^2 + AD^2 \\\\ 25 = 9 + AD^2",
+            "position": [30, 60],
+            "font_size": 32,
+            "animation": {
+              "enter": "slide_in_left",
+              "exit": "fade_out",
+              "duration": 1
+            }
+          },
+          {
+            "type": "formula",
+            "content": "AD^2 = 16 \\Rightarrow AD = 4",
+            "position": [30, 70],
+            "font_size": 32,
+            "animation": {
+              "enter": "slide_in_left",
+              "exit": "fade_out",
+              "duration": 1
+            }
+          }
+        ]
+      },
+      {
+        "step_id": 4,
+        "title": "求解弦长",
+        "duration": 30,
+        "elements": [
+          {
+            "type": "formula",
+            "content": "AB = 2 \\times AD = 8",
+            "position": [50, 80],
+            "font_size": 36,
+            "animation": {
+              "enter": "slide_in_left",
+              "exit": "fade_out",
+              "duration": 1
+            }
+          },
+          {
+            "type": "text",
+            "content": "选项B正确",
+            "position": [70, 90],
+            "font_size": 36,
+            "animation": {
+              "enter": "highlight",
+              "exit": "fade_out",
+              "duration": 1
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "audio": {
+    "narration": [
+      {
+        "text": "我们现在看到的是一个经典的圆弦长计算问题。题目给出圆的半径OA为5，半径OC与弦AB垂直且OD=3。",
+        "start_time": 0,
+        "end_time": 12,
+        "voice_config": {
+          "speaker": "teacher_female",
+          "speed": 1.0,
+          "pitch": 1.0
+        },
+        "ssml": "<speak>我们现在看到的是一个经典的圆弦长计算问题。题目给出圆的半径<say-as interpret-as=\"math\">OA=5</say-as>，半径<say-as interpret-as=\"math\">OC</say-as>与弦<say-as interpret-as=\"math\">AB</say-as>垂直且<say-as interpret-as=\"math\">OD=3</say-as>。</speak>"
+      },
+      {
+        "text": "注意这里的关键是发现直角三角形OAD。根据勾股定理，OA平方等于OD平方加上AD平方。",
+        "start_time": 15,
+        "end_time": 27,
+        "voice_config": {
+          "speaker": "teacher_female",
+          "speed": 1.0,
+          "pitch": 1.0
+        },
+        "ssml": "<speak>注意这里的关键是发现直角三角形<say-as interpret-as=\"math\">OAD</say-as>。根据<emphasis>勾股定理</emphasis>，<say-as interpret-as=\"math\">OA^2 = OD^2 + AD^2</say-as>。</speak>"
+      },
+      {
+        "text": "代入数值计算：5的平方等于3的平方加AD平方，得到AD等于4。这里特别注意平方根只取正值，因为长度不能为负。",
+        "start_time": 30,
+        "end_time": 49,
+        "voice_config": {
+          "speaker": "teacher_female",
+          "speed": 1.0,
+          "pitch": 1.0
+        },
+        "ssml": "<speak>代入数值计算：<say-as interpret-as=\"math\">5^2 = 3^2 + AD^2</say-as>，得到<say-as interpret-as=\"math\">AD = 4</say-as>。这里特别注意平方根只取正值，因为长度不能为负。</speak>"
+      },
+      {
+        "text": "最后，由于D是AB的中点，弦长AB就是AD的两倍，也就是8。因此正确选项是B。",
+        "start_time": 50,
+        "end_time": 65,
+        "voice_config": {
+          "speaker": "teacher_female",
+          "speed": 1.0,
+          "pitch": 1.0
+        },
+        "ssml": "<speak>最后，由于<say-as interpret-as=\"math\">D</say-as>是<say-as interpret-as=\"math\">AB</say-as>的中点，弦长<say-as interpret-as=\"math\">AB</say-as>就是<say-as interpret-as=\"math\">AD</say-as>的两倍，也就是<say-as interpret-as=\"math\">8</say-as>。因此正确选项是<emphasis>B</emphasis>。</speak>"
+      }
+    ],
+    "background_music": "soft_classroom"
+  },
+  "annotations": {
+    "key_points": [
+      {
+        "timestamp": 27,
+        "concept": "垂直半径定理",
+        "reference_link": "https://example.com/math/perpendicular-radius"
+      },
+      {
+        "timestamp": 45,
+        "concept": "算术平方根",
+        "reference_link": "https://example.com/math/square-root"
+      }
+    ]
+  }
+} 

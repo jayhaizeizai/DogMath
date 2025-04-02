@@ -1,0 +1,1213 @@
+from typing import List, Dict, Any, Tuple
+import numpy as np
+import cv2
+from loguru import logger
+import matplotlib
+import matplotlib.pyplot as plt
+from matplotlib import mathtext
+import os
+import io
+import tempfile
+import time
+import subprocess
+import sys
+import re
+
+class BlackboardVideoGenerator:
+    """黑板视频生成器"""
+    
+    def __init__(self, width: int = 1920, height: int = 1080, debug: bool = False):
+        """
+        初始化黑板视频生成器
+        
+        Args:
+            width: 视频宽度
+            height: 视频高度
+            debug: 是否启用调试模式
+        """
+        self.width = width
+        self.height = height
+        self.debug = debug
+        self.logger = logger.bind(context="blackboard_video")
+        
+        # 配置matplotlib
+        self._setup_matplotlib()
+        
+        if self.debug:
+            self.logger.info(f"初始化黑板视频生成器: width={width}, height={height}")
+            
+    def _setup_matplotlib(self):
+        """配置matplotlib的渲染设置"""
+        # 设置中文字体
+        plt.rcParams['font.sans-serif'] = [
+            'WenQuanYi Micro Hei', 
+            'WenQuanYi Zen Hei', 
+            'Noto Sans CJK SC', 
+            'Source Han Sans CN', 
+            'Hiragino Sans GB', 
+            'Microsoft YaHei', 
+            'SimHei', 
+            'STHeiti', 
+            'DejaVu Sans'
+        ]
+        plt.rcParams['axes.unicode_minus'] = False  # 用来正常显示负号
+        plt.rcParams['font.family'] = 'sans-serif'
+        matplotlib.use('Agg')  # 使用无界面后端
+        
+        # 打印当前可用字体
+        if self.debug:
+            try:
+                from matplotlib.font_manager import fontManager
+                font_names = sorted([f.name for f in fontManager.ttflist])
+                self.logger.info(f"可用字体: {', '.join(font_names[:10])}...")
+            except Exception as e:
+                self.logger.warning(f"无法获取字体列表: {str(e)}")
+        
+    def generate_video(self, data):
+        """生成视频"""
+        try:
+            # 获取分辨率
+            width, height = data.get('resolution', [1920, 1080])
+            
+            # 记录日志
+            if self.debug:
+                self.logger.info(f"生成视频，分辨率: {width}x{height}")
+                self.logger.info(f"黑板数据: {data}")
+            
+            # 计算视频时长
+            total_duration = 0
+            for step in data.get('steps', []):
+                total_duration += step.get('duration', 0)
+                
+            # 如果没有时长，设为默认值
+            if total_duration <= 0:
+                total_duration = 5  # 默认5秒
+            
+            # 设置视频参数
+            fps = 30
+            total_frames = int(total_duration * fps)
+            
+            # 创建临时视频文件
+            temp_output = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False)
+            temp_output.close()
+            
+            # 创建视频写入器 - 使用H.264编码器
+            # 尝试使用H.264编码器
+            try:
+                fourcc = cv2.VideoWriter_fourcc(*'avc1')  # H.264编码器
+                video_writer = cv2.VideoWriter(
+                    temp_output.name,
+                    fourcc,
+                    fps,
+                    (width, height)
+                )
+                
+                # 检查视频写入器是否正确打开
+                if not video_writer.isOpened():
+                    # 如果avc1失败，尝试mp4v
+                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                    video_writer = cv2.VideoWriter(
+                        temp_output.name,
+                        fourcc,
+                        fps,
+                        (width, height)
+                    )
+                    logger.info(f"切换到备用编码器: mp4v")
+                    
+                    # 如果mp4v也失败，回退到XVID
+                    if not video_writer.isOpened():
+                        fourcc = cv2.VideoWriter_fourcc(*'XVID')
+                        video_writer = cv2.VideoWriter(
+                            temp_output.name,
+                            fourcc,
+                            fps,
+                            (width, height)
+                        )
+                        logger.info(f"切换到备用编码器: XVID")
+            except Exception as e:
+                # 如果出现异常，回退到基本的mp4v编码器
+                logger.warning(f"编码器错误: {str(e)}，回退到mp4v编码器")
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                video_writer = cv2.VideoWriter(
+                    temp_output.name,
+                    fourcc,
+                    fps,
+                    (width, height)
+                )
+            
+            if self.debug:
+                self.logger.info(f"创建视频文件: {temp_output.name}, FPS: {fps}")
+            
+            # 创建黑板背景
+            background = self._create_blackboard_background(width, height)
+            
+            # 处理所有步骤，生成时间轴
+            timeline = []
+            current_time = 0
+            
+            for step in data.get('steps', []):
+                step_duration = step.get('duration', 5)
+                step_frames = int(step_duration * fps)
+                
+                for element in step.get('elements', []):
+                    if element.get('type') == 'formula':
+                        formula = element.get('content', '')
+                        font_size = element.get('font_size', 32)
+                        position = element.get('position', [width//2, height//2])
+                        
+                        # 渲染公式
+                        formula_img = self._render_formula(formula, font_size)
+                        
+                        # 计算公式位置
+                        img_h, img_w = formula_img.shape[:2]
+                        x = position[0] - img_w // 2
+                        y = position[1] - img_h // 2
+                        
+                        # 处理动画
+                        animation = element.get('animation', {})
+                        fade_in_frames = 0
+                        
+                        if animation.get('enter') == 'fade_in':
+                            fade_duration = animation.get('duration', 1)
+                            fade_in_frames = int(fade_duration * fps)
+                        
+                        # 添加到时间轴
+                        timeline.append({
+                            'type': 'formula',
+                            'content': formula_img,
+                            'position': (x, y),
+                            'start_frame': int(current_time * fps),
+                            'end_frame': int((current_time + step_duration) * fps),
+                            'fade_in_frames': fade_in_frames
+                        })
+                    elif element.get('type') == 'text':
+                        text = element.get('content', '')
+                        font_size = element.get('font_size', 32)
+                        position = element.get('position', [width//2, height//2])
+                        
+                        # 渲染文本
+                        text_img = self._render_text(text, font_size)
+                        
+                        # 计算文本位置
+                        img_h, img_w = text_img.shape[:2]
+                        x = position[0] - img_w // 2
+                        y = position[1] - img_h // 2
+                        
+                        # 处理动画
+                        animation = element.get('animation', {})
+                        fade_in_frames = 0
+                        
+                        if animation.get('enter') == 'fade_in':
+                            fade_duration = animation.get('duration', 1)
+                            fade_in_frames = int(fade_duration * fps)
+                        
+                        # 添加到时间轴
+                        timeline.append({
+                            'type': 'text',
+                            'content': text_img,
+                            'position': (x, y),
+                            'start_frame': int(current_time * fps),
+                            'end_frame': int((current_time + step_duration) * fps),
+                            'fade_in_frames': fade_in_frames
+                        })
+                    elif element.get('type') == 'geometry':
+                        svg_path = element.get('content', '')
+                        position = element.get('position', [width//2, height//2])
+                        font_size = element.get('font_size', 32)  # 这里用作缩放因子
+                        
+                        # 渲染几何图形
+                        geo_img = self._render_geometry(svg_path, font_size)
+                        
+                        # 计算几何图形位置
+                        img_h, img_w = geo_img.shape[:2]
+                        x = position[0] - img_w // 2
+                        y = position[1] - img_h // 2
+                        
+                        # 处理动画
+                        animation = element.get('animation', {})
+                        fade_in_frames = 0
+                        draw_path_frames = 0
+                        
+                        if animation.get('enter') == 'fade_in':
+                            fade_duration = animation.get('duration', 1)
+                            fade_in_frames = int(fade_duration * fps)
+                        elif animation.get('enter') == 'draw_path':
+                            draw_duration = animation.get('duration', 3)
+                            draw_path_frames = int(draw_duration * fps)
+                        
+                        # 添加到时间轴
+                        
+                        # 添加到时间轴
+                        timeline.append({
+                            'type': 'geometry',
+                            'content': geo_img,
+                            'position': (x, y),
+                            'start_frame': int(current_time * fps),
+                            'end_frame': int((current_time + step_duration) * fps),
+                            'fade_in_frames': fade_in_frames,
+                            'draw_path_frames': draw_path_frames,
+                            'svg_path': svg_path,  # 添加SVG路径
+                            'scale_factor': font_size  # 添加缩放因子
+                        })
+    
+                
+                current_time += step_duration
+            
+            # 生成视频帧
+            for frame_idx in range(total_frames):
+                # 复制背景
+                frame = background.copy()
+                
+                # 渲染当前帧的所有元素
+                for item in timeline:
+                    if item['start_frame'] <= frame_idx < item['end_frame']:
+                        # 获取内容
+                        content = item['content']
+                        pos_x, pos_y = item['position']
+                        
+                        # 计算Alpha值（淡入效果）
+                        alpha = 1.0
+                        if item['fade_in_frames'] > 0 and frame_idx < item['start_frame'] + item['fade_in_frames']:
+                            relative_frame = frame_idx - item['start_frame']
+                            alpha = relative_frame / item['fade_in_frames']
+                        
+                        # 处理几何图形动画
+                        if item['type'] == 'geometry' and 'draw_path_frames' in item and item['draw_path_frames'] > 0 and 'svg_path' in item:
+                            draw_path_frames = item['draw_path_frames']
+                            
+                            # 计算绘制动画的进度
+                            if frame_idx < item['start_frame'] + draw_path_frames:
+                                relative_frame = frame_idx - item['start_frame']
+                                progress = relative_frame / draw_path_frames
+                                
+                                # 创建临时画布用于渲染部分几何图形
+                                svg_path = item['svg_path']
+                                scale_factor = item.get('scale_factor', 32)
+                                h, w = content.shape[:2]
+                                temp_canvas = np.ones((h, w, 3), dtype=np.uint8) * np.array([30, 30, 30], dtype=np.uint8)
+                                
+                                # 使用部分几何图形渲染方法
+                                self._render_partial_geometry(temp_canvas, svg_path, scale_factor, progress)
+                                
+                                # 合成元素到帧中
+                                self._blend_image_to_frame(frame, temp_canvas, pos_x, pos_y, alpha)
+                            else:
+                                # 合成完整元素到帧中
+                                self._blend_image_to_frame(frame, content, pos_x, pos_y, alpha)
+                        else:
+                            # 合成元素到帧中
+                            self._blend_image_to_frame(frame, content, pos_x, pos_y, alpha)
+                
+                # 写入帧
+                video_writer.write(frame)
+                
+                # 显示进度
+                if self.debug and frame_idx % 30 == 0:
+                    print(f"正在生成视频 {frame_idx}/{total_frames} 帧 ({frame_idx/total_frames*100:.1f}%)")
+            
+            # 释放视频写入器
+            video_writer.release()
+            
+            # 使用ffmpeg进行高效压缩
+            try:
+                self.logger.info("使用ffmpeg进行视频压缩优化")
+                # 创建一个新的临时文件用于压缩后的视频
+                compressed_output = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False)
+                compressed_output.close()
+                
+                # 检查ffmpeg是否可用
+                try:
+                    subprocess.run(["ffmpeg", "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+                    
+                    # 使用ffmpeg进行高效压缩
+                    cmd = [
+                        "ffmpeg", 
+                        "-i", temp_output.name,  # 输入文件
+                        "-c:v", "libx264",       # 视频编码器
+                        "-preset", "medium",     # 编码速度和压缩比的平衡
+                        "-crf", "23",            # 质量参数，越低质量越好
+                        "-y",                    # 覆盖输出文件
+                        compressed_output.name   # 输出文件
+                    ]
+                    
+                    # 执行ffmpeg命令
+                    process = subprocess.run(
+                        cmd, 
+                        stdout=subprocess.PIPE, 
+                        stderr=subprocess.PIPE,
+                        check=True
+                    )
+                    
+                    # 检查压缩后的文件是否存在且大小较小
+                    if os.path.exists(compressed_output.name):
+                        original_size = os.path.getsize(temp_output.name)
+                        compressed_size = os.path.getsize(compressed_output.name)
+                        
+                        compression_ratio = (original_size - compressed_size) / original_size * 100
+                        self.logger.info(f"压缩成功: {original_size/1024/1024:.2f}MB -> {compressed_size/1024/1024:.2f}MB (节省 {compression_ratio:.1f}%)")
+                        
+                        # 删除原始文件
+                        os.remove(temp_output.name)
+                        # 返回压缩后的文件
+                        return compressed_output.name
+                    else:
+                        self.logger.warning("压缩失败，使用原始视频文件")
+                        # 删除压缩文件
+                        if os.path.exists(compressed_output.name):
+                            os.remove(compressed_output.name)
+                except subprocess.CalledProcessError:
+                    self.logger.warning("ffmpeg不可用或执行失败，使用原始视频文件")
+                    if os.path.exists(compressed_output.name):
+                        os.remove(compressed_output.name)
+                except Exception as e:
+                    self.logger.warning(f"压缩过程中出错: {str(e)}，使用原始视频文件")
+                    if os.path.exists(compressed_output.name):
+                        os.remove(compressed_output.name)
+            except Exception as e:
+                self.logger.warning(f"压缩处理出错: {str(e)}，使用原始视频文件")
+            
+            # 返回临时文件路径
+            return temp_output.name
+            
+        except Exception as e:
+            self.logger.error(f"生成视频时出错: {str(e)}")
+            # 创建一个简单的错误视频
+            error_video_path = os.path.join(tempfile.gettempdir(), f"error_video_{int(time.time())}.mp4")
+            try:
+                # 首先尝试mp4v编码器
+                empty_writer = cv2.VideoWriter(
+                    error_video_path,
+                    cv2.VideoWriter_fourcc(*'mp4v'),
+                    30,
+                    (640, 480)
+                )
+                
+                # 如果失败，回退到XVID
+                if not empty_writer.isOpened():
+                    error_video_path = os.path.join(tempfile.gettempdir(), f"error_video_{int(time.time())}.avi")
+                    empty_writer = cv2.VideoWriter(
+                        error_video_path,
+                        cv2.VideoWriter_fourcc(*'XVID'),
+                        30,
+                        (640, 480)
+                    )
+                
+                # 生成5秒的错误帧
+                for _ in range(150):  # 5秒
+                    frame = np.zeros((480, 640, 3), dtype=np.uint8)
+                    cv2.putText(frame, f"Error: {str(e)[:50]}", (50, 240), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                    empty_writer.write(frame)
+                    
+                # 释放视频写入器
+                empty_writer.release()
+                return error_video_path
+            except Exception as e:
+                # 如果出现异常，返回一个假的路径（需要在调用函数中处理）
+                self.logger.error("无法创建错误视频")
+                return None
+    
+    def _create_blackboard_background(self, width: int, height: int) -> np.ndarray:
+        """创建黑板背景"""
+        # 创建黑色背景
+        background = np.ones((height, width, 3), dtype=np.uint8) * np.array([30, 30, 30], dtype=np.uint8)
+        
+        # 添加轻微噪点和纹理
+        noise = np.random.normal(0, 5, background.shape).astype(np.int16)
+        background = np.clip(background.astype(np.int16) + noise, 10, 50).astype(np.uint8)
+        
+        # 添加一些粉笔灰
+        dust_mask = np.random.random(background.shape[:2]) > 0.995
+        background[dust_mask] = np.array([70, 70, 70])
+        
+        return background
+    
+    def _blend_image_to_frame(self, frame: np.ndarray, img: np.ndarray, x: int, y: int, alpha: float = 1.0):
+        """将图像混合到帧中"""
+        h, w = img.shape[:2]
+        
+        # 确保坐标在有效范围内
+        if x < 0 or y < 0:
+            return
+        
+        if x + w > frame.shape[1] or y + h > frame.shape[0]:
+            return
+        
+        # 计算ROI
+        roi = frame[y:y+h, x:x+w]
+        
+        # 应用alpha混合
+        if alpha < 1.0:
+            cv2.addWeighted(img, alpha, roi, 1 - alpha, 0, roi)
+        else:
+            roi[:] = img
+            
+    def _render_formula(self, formula: str, font_size: int) -> np.ndarray:
+        """
+        渲染公式
+        
+        Args:
+            formula: 公式字符串
+            font_size: 字体大小
+            
+        Returns:
+            公式图像
+        """
+        try:
+            # 检测是否含有中文
+            has_chinese = any('\u4e00' <= c <= '\u9fff' for c in formula)
+            
+            # 检测是否含有LaTeX格式的公式
+            is_latex = '\\' in formula or '$' in formula
+            
+            # 混合内容处理（中文+LaTeX）
+            if has_chinese and is_latex:
+                # 分割文本和LaTeX公式
+                components = re.split(r'(\$[^$]*\$)', formula)
+                
+                # 如果只有一个LaTeX部分，就尝试简单地组合中文和LaTeX
+                if sum(1 for c in components if c.startswith('$') and c.endswith('$')) == 1:
+                    ltx_idx = next((i for i, c in enumerate(components) if c.startswith('$') and c.endswith('$')), -1)
+                    
+                    if ltx_idx >= 0:
+                        # 提取文本和LaTeX部分
+                        ch_text = ''.join(components[:ltx_idx] + components[ltx_idx+1:]).strip()
+                        ltx_formula = components[ltx_idx]
+                        
+                        # 分别渲染中文和LaTeX
+                        chinese_img = self._render_text_as_image(ch_text, font_size)
+                        latex_img = self._render_latex_as_image(ltx_formula, font_size)
+                        
+                        # 组合两个图像（水平放置）
+                        ch_h, ch_w = chinese_img.shape[:2]
+                        ltx_h, ltx_w = latex_img.shape[:2]
+                        
+                        max_height = max(ch_h, ltx_h)
+                        total_width = ch_w + ltx_w + 20  # 添加一些间隔
+                        
+                        combined_img = np.ones((max_height, total_width, 3), dtype=np.uint8) * np.array([30, 30, 30], dtype=np.uint8)
+                        
+                        # 放置中文文本图像
+                        y_offset_ch = (max_height - ch_h) // 2
+                        combined_img[y_offset_ch:y_offset_ch+ch_h, 0:ch_w] = chinese_img
+                        
+                        # 放置LaTeX图像
+                        y_offset_ltx = (max_height - ltx_h) // 2
+                        combined_img[y_offset_ltx:y_offset_ltx+ltx_h, ch_w+20:ch_w+20+ltx_w] = latex_img
+                        
+                        # 检查是否需要缩放最终图像
+                        max_width = 800  # 最大宽度
+                        max_img_height = 600  # 最大高度
+                        
+                        h, w = combined_img.shape[:2]
+                        if self.debug:
+                            self.logger.info(f"组合公式原始图像大小: {w}x{h}")
+                        
+                        # 如果图像太大，进行等比例缩放
+                        if w > max_width or h > max_img_height:
+                            scale = min(max_width / w, max_img_height / h)
+                            new_w = int(w * scale)
+                            new_h = int(h * scale)
+                            combined_img = cv2.resize(combined_img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+                            if self.debug:
+                                self.logger.info(f"组合公式缩放后图像大小: {new_w}x{new_h}")
+                        
+                        return combined_img
+            
+            # 对于纯中文公式(不含LaTeX格式)
+            if has_chinese and not is_latex:
+                return self._render_text_as_image(formula, font_size)
+                
+            # 对于纯LaTeX公式
+            if is_latex:
+                # 确保LaTeX公式有$符号
+                if not formula.startswith('$') and not formula.endswith('$'):
+                    formula = f'${formula}$'
+                return self._render_latex_as_image(formula, font_size)
+            
+            # 对于普通文本
+            return self._render_text_as_image(formula, font_size)
+            
+        except Exception as e:
+            self.logger.error(f"渲染公式时出错: {str(e)}")
+            # 创建一个默认图像
+            img = np.zeros((100, 300, 3), dtype=np.uint8)
+            cv2.putText(img, "Formula Error", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            return img
+            
+    def _render_text_as_image(self, text: str, font_size: int) -> np.ndarray:
+        """
+        将文本渲染为图像
+        
+        Args:
+            text: 文本内容
+            font_size: 字体大小
+            
+        Returns:
+            文本图像
+        """
+        try:
+            # 创建matplotlib图形
+            fig = plt.figure(figsize=(10, 2), dpi=200, facecolor='none')
+            ax = fig.add_subplot(111)
+            
+            # 设置背景完全透明
+            fig.patch.set_alpha(0.0)
+            ax.set_facecolor((0, 0, 0, 0))
+            ax.patch.set_alpha(0.0)
+            
+            # 尝试检测可用的中文字体
+            chinese_font = None
+            has_chinese = any('\u4e00' <= c <= '\u9fff' for c in text)
+            
+            if has_chinese:
+                try:
+                    from matplotlib.font_manager import fontManager
+                    font_priorities = [
+                        'Noto Sans CJK SC', 
+                        'Noto Sans CJK JP', 
+                        'Source Han Sans CN', 
+                        'WenQuanYi Micro Hei', 
+                        'WenQuanYi Zen Hei', 
+                        'Microsoft YaHei', 
+                        'SimHei', 
+                        'STHeiti'
+                    ]
+                    
+                    for font in font_priorities:
+                        matching_fonts = [f.name for f in fontManager.ttflist if font.lower() in f.name.lower()]
+                        if matching_fonts:
+                            chinese_font = matching_fonts[0]
+                            if self.debug:
+                                self.logger.info(f"文本渲染使用中文字体: {chinese_font}")
+                            break
+                except Exception as e:
+                    if self.debug:
+                        self.logger.warning(f"检测中文字体失败: {str(e)}")
+                
+            # 渲染文本
+            if chinese_font:
+                ax.text(0.5, 0.5, text, 
+                       fontsize=font_size*0.8,  # 调整字体大小
+                       color='white',
+                       horizontalalignment='center',
+                       verticalalignment='center',
+                       transform=ax.transAxes,
+                       family=chinese_font)
+            else:
+                # 如果没有找到合适的中文字体，尝试用sans-serif字体族
+                ax.text(0.5, 0.5, text, 
+                       fontsize=font_size*0.8,  # 调整字体大小
+                       color='white',
+                       horizontalalignment='center',
+                       verticalalignment='center',
+                       transform=ax.transAxes,
+                       family='sans-serif')
+                if self.debug and has_chinese:
+                    self.logger.warning("未找到中文字体，使用sans-serif族")
+            
+            # 移除坐标轴和边框
+            ax.axis('off')
+            for spine in ax.spines.values():
+                spine.set_visible(False)
+            
+            # 调整边距
+            plt.tight_layout(pad=0.5)
+            
+            # 将图形转换为图像
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png', 
+                       bbox_inches='tight',
+                       pad_inches=0.2,
+                       facecolor='none',
+                       edgecolor='none',
+                       transparent=True)
+            plt.close(fig)
+            
+            # 读取图像数据
+            buf.seek(0)
+            img = cv2.imdecode(np.frombuffer(buf.read(), np.uint8), cv2.IMREAD_UNCHANGED)
+            
+            # 处理透明通道 (BGRA -> RGB)
+            if img.shape[2] == 4:  # BGRA
+                # 创建一个与黑板背景颜色匹配的画布
+                canvas = np.ones((img.shape[0], img.shape[1], 3), dtype=np.uint8) * np.array([30, 30, 30], dtype=np.uint8)
+                
+                # 提取透明通道作为蒙版
+                alpha = img[:, :, 3] / 255.0
+                
+                # 只将非透明部分渲染为白色
+                for c in range(3):  # RGB通道
+                    canvas[:, :, c] = canvas[:, :, c] * (1 - alpha) + 255 * alpha
+                
+                return canvas
+            else:
+                return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                
+        except Exception as e:
+            self.logger.error(f"渲染文本为图像时出错: {str(e)}")
+            # 创建一个默认图像
+            img = np.zeros((100, max(len(text) * 20, 200), 3), dtype=np.uint8)
+            cv2.putText(img, "Text Error", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            return img
+            
+    def _render_latex_as_image(self, latex: str, font_size: int) -> np.ndarray:
+        """
+        将LaTeX公式渲染为图像
+        
+        Args:
+            latex: LaTeX公式
+            font_size: 字体大小
+            
+        Returns:
+            公式图像
+        """
+        try:
+            # 创建matplotlib图形
+            fig = plt.figure(figsize=(8, 2), dpi=300, facecolor='none')
+            ax = fig.add_subplot(111)
+            
+            # 设置背景完全透明
+            fig.patch.set_alpha(0.0)
+            ax.set_facecolor((0, 0, 0, 0))
+            ax.patch.set_alpha(0.0)
+            
+            # 渲染LaTeX
+            ax.text(0.5, 0.5, latex, 
+                   fontsize=font_size*1.5,  # 增大字体大小
+                   color='white',
+                   horizontalalignment='center',
+                   verticalalignment='center',
+                   transform=ax.transAxes)
+            
+            # 移除坐标轴和边框
+            ax.axis('off')
+            for spine in ax.spines.values():
+                spine.set_visible(False)
+            
+            # 增加边距
+            plt.tight_layout(pad=0.8)
+            
+            # 将图形转换为图像，确保保留完整区域且透明
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png', 
+                        bbox_inches='tight',
+                        pad_inches=0.2,
+                        facecolor='none',
+                        edgecolor='none',
+                        transparent=True)
+            plt.close(fig)
+            
+            # 读取图像数据
+            buf.seek(0)
+            img = cv2.imdecode(np.frombuffer(buf.read(), np.uint8), cv2.IMREAD_UNCHANGED)
+            
+            # 处理透明通道 (BGRA -> RGB)
+            if img.shape[2] == 4:  # BGRA
+                # 创建一个与黑板背景颜色匹配的画布
+                canvas = np.ones((img.shape[0], img.shape[1], 3), dtype=np.uint8) * np.array([30, 30, 30], dtype=np.uint8)
+                
+                # 提取透明通道作为蒙版
+                alpha = img[:, :, 3] / 255.0
+                
+                # 只将非透明部分渲染为白色
+                for c in range(3):  # RGB通道
+                    canvas[:, :, c] = canvas[:, :, c] * (1 - alpha) + 255 * alpha
+                
+                # 检查是否需要缩放图像
+                max_width = 800  # 最大宽度
+                max_height = 600  # 最大高度
+                
+                h, w = canvas.shape[:2]
+                if self.debug:
+                    self.logger.info(f"LaTeX公式原始图像大小: {w}x{h}")
+                
+                # 如果图像太大，进行等比例缩放
+                if w > max_width or h > max_height:
+                    scale = min(max_width / w, max_height / h)
+                    new_w = int(w * scale)
+                    new_h = int(h * scale)
+                    canvas = cv2.resize(canvas, (new_w, new_h), interpolation=cv2.INTER_AREA)
+                    if self.debug:
+                        self.logger.info(f"LaTeX公式缩放后图像大小: {new_w}x{new_h}")
+                
+                return canvas
+            else:
+                return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                
+        except Exception as e:
+            self.logger.error(f"渲染LaTeX公式时出错: {str(e)}")
+            # 创建一个默认图像，使用与黑板背景匹配的颜色
+            img = np.ones((100, 300, 3), dtype=np.uint8) * np.array([30, 30, 30], dtype=np.uint8)
+            cv2.putText(img, "LaTeX Error", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            return img
+
+    def _render_text(self, text: str, font_size: int) -> np.ndarray:
+        """
+        渲染文本
+        
+        Args:
+            text: 文本内容
+            font_size: 字体大小
+            
+        Returns:
+            文本图像
+        """
+        try:
+            # 创建matplotlib图形
+            fig = plt.figure(figsize=(10, 2), dpi=200, facecolor='none')
+            ax = fig.add_subplot(111)
+            
+            # 设置背景完全透明
+            fig.patch.set_alpha(0.0)
+            ax.set_facecolor((0, 0, 0, 0))
+            ax.patch.set_alpha(0.0)
+            
+            # 尝试检测可用的中文字体
+            chinese_font = None
+            try:
+                from matplotlib.font_manager import fontManager
+                font_priorities = [
+                    'Noto Sans CJK SC', 
+                    'Noto Sans CJK JP', 
+                    'Source Han Sans CN', 
+                    'WenQuanYi Micro Hei', 
+                    'WenQuanYi Zen Hei', 
+                    'Microsoft YaHei', 
+                    'SimHei', 
+                    'STHeiti'
+                ]
+                
+                for font in font_priorities:
+                    matching_fonts = [f.name for f in fontManager.ttflist if font.lower() in f.name.lower()]
+                    if matching_fonts:
+                        chinese_font = matching_fonts[0]
+                        if self.debug:
+                            self.logger.info(f"选择中文字体: {chinese_font}")
+                        break
+            except Exception as e:
+                if self.debug:
+                    self.logger.warning(f"检测中文字体失败: {str(e)}")
+                
+            # 渲染文本
+            if chinese_font:
+                ax.text(0.5, 0.5, text, 
+                       fontsize=font_size*0.8,  # 调整字体大小
+                       color='white',
+                       horizontalalignment='center',
+                       verticalalignment='center',
+                       transform=ax.transAxes,
+                       family=chinese_font)
+            else:
+                # 如果没有找到合适的中文字体，尝试用sans-serif字体族
+                ax.text(0.5, 0.5, text, 
+                       fontsize=font_size*0.8,  # 调整字体大小
+                       color='white',
+                       horizontalalignment='center',
+                       verticalalignment='center',
+                       transform=ax.transAxes,
+                       family='sans-serif')
+                if self.debug:
+                    self.logger.warning("未找到中文字体，使用sans-serif族")
+            
+            # 移除坐标轴和边框
+            ax.axis('off')
+            for spine in ax.spines.values():
+                spine.set_visible(False)
+            
+            # 调整边距
+            plt.tight_layout(pad=0.5)
+            
+            # 将图形转换为图像
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png', 
+                       bbox_inches='tight',
+                       pad_inches=0.2,
+                       facecolor='none',
+                       edgecolor='none',
+                       transparent=True)
+            plt.close(fig)
+            
+            # 读取图像数据
+            buf.seek(0)
+            img = cv2.imdecode(np.frombuffer(buf.read(), np.uint8), cv2.IMREAD_UNCHANGED)
+            
+            # 处理透明通道 (BGRA -> RGB)
+            if img.shape[2] == 4:  # BGRA
+                # 创建一个与黑板背景颜色匹配的画布
+                canvas = np.ones((img.shape[0], img.shape[1], 3), dtype=np.uint8) * np.array([30, 30, 30], dtype=np.uint8)
+                
+                # 提取透明通道作为蒙版
+                alpha = img[:, :, 3] / 255.0
+                
+                # 只将非透明部分（文本）渲染为白色
+                for c in range(3):  # RGB通道
+                    canvas[:, :, c] = canvas[:, :, c] * (1 - alpha) + 255 * alpha
+                
+                # 检查是否需要缩放图像
+                max_width = 800  # 最大宽度
+                max_height = 600  # 最大高度
+                
+                h, w = canvas.shape[:2]
+                if self.debug:
+                    self.logger.info(f"文本原始图像大小: {w}x{h}")
+                
+                # 如果图像太大，进行等比例缩放
+                if w > max_width or h > max_height:
+                    scale = min(max_width / w, max_height / h)
+                    new_w = int(w * scale)
+                    new_h = int(h * scale)
+                    canvas = cv2.resize(canvas, (new_w, new_h), interpolation=cv2.INTER_AREA)
+                    if self.debug:
+                        self.logger.info(f"文本缩放后图像大小: {new_w}x{new_h}")
+                
+                return canvas
+            else:
+                return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                
+        except Exception as e:
+            self.logger.error(f"渲染文本时出错: {str(e)}")
+            # 创建一个默认图像 - 使用OpenCV渲染文本（无中文支持）
+            img = np.zeros((100, max(len(text) * 20, 200), 3), dtype=np.uint8)
+            cv2.putText(img, "Text Error", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            return img
+
+    def _render_geometry(self, svg_path: str, scale_factor: int) -> np.ndarray:
+        """
+        渲染几何图形
+        
+        Args:
+            svg_path: SVG路径字符串
+            scale_factor: 缩放因子
+            
+        Returns:
+            渲染后的图像
+        """
+        try:
+            # 创建一个空白画布 - 使用深灰色背景以匹配黑板
+            img_size = 256  # 默认几何图形大小
+            canvas = np.ones((img_size, img_size, 3), dtype=np.uint8) * np.array([30, 30, 30], dtype=np.uint8)
+            
+            # 解析SVG路径
+            # 这里是一个简化版，只支持基本的移动(M)、线(L)和圆弧(A)命令
+            path_commands = svg_path.strip().split(' ')
+            points = []
+            current_point = None
+            
+            # 计算缩放和偏移，使图形居中
+            scale = scale_factor / 100  # 假设SVG坐标在0-100范围内
+            offset_x = img_size // 2
+            offset_y = img_size // 2
+            
+            i = 0
+            while i < len(path_commands):
+                cmd = path_commands[i]
+                
+                if cmd == 'M' or cmd == 'm':  # 移动
+                    x = float(path_commands[i+1])
+                    y = float(path_commands[i+2])
+                    if cmd == 'M':  # 绝对坐标
+                        current_point = (int(x * scale + offset_x), int(y * scale + offset_y))
+                    else:  # 相对坐标
+                        if current_point:
+                            current_point = (int(current_point[0] + x * scale), int(current_point[1] + y * scale))
+                        else:
+                            current_point = (int(x * scale + offset_x), int(y * scale + offset_y))
+                    points.append(current_point)
+                    i += 3
+                    
+                elif cmd == 'L' or cmd == 'l':  # 线
+                    x = float(path_commands[i+1])
+                    y = float(path_commands[i+2])
+                    if cmd == 'L':  # 绝对坐标
+                        next_point = (int(x * scale + offset_x), int(y * scale + offset_y))
+                    else:  # 相对坐标
+                        next_point = (int(current_point[0] + x * scale), int(current_point[1] + y * scale))
+                    
+                    if current_point and next_point:
+                        cv2.line(canvas, current_point, next_point, (255, 255, 255), 2)
+                    
+                    current_point = next_point
+                    points.append(current_point)
+                    i += 3
+                    
+                elif cmd == 'A' or cmd == 'a':  # 圆弧 (简化处理)
+                    # 圆弧参数: rx ry x-axis-rotation large-arc-flag sweep-flag x y
+                    rx = float(path_commands[i+1])
+                    ry = float(path_commands[i+2])
+                    x_axis_rot = float(path_commands[i+3])
+                    large_arc = int(path_commands[i+4])
+                    sweep = int(path_commands[i+5])
+                    x = float(path_commands[i+6])
+                    y = float(path_commands[i+7])
+                    
+                    if cmd == 'A':  # 绝对坐标
+                        next_point = (int(x * scale + offset_x), int(y * scale + offset_y))
+                    else:  # 相对坐标
+                        next_point = (int(current_point[0] + x * scale), int(current_point[1] + y * scale))
+                    
+                    # 简化：绘制一条直线来代替圆弧
+                    if current_point and next_point:
+                        cv2.line(canvas, current_point, next_point, (255, 255, 255), 2)
+                    
+                    current_point = next_point
+                    points.append(current_point)
+                    i += 8
+                    
+                elif cmd == 'Z' or cmd == 'z':  # 闭合路径
+                    if len(points) > 1 and points[0] != current_point:
+                        cv2.line(canvas, current_point, points[0], (255, 255, 255), 2)
+                    i += 1
+                    
+                else:
+                    # 跳过未识别的命令
+                    i += 1
+            
+            # 如果有足够的点来形成一个闭合路径，尝试填充
+            if len(points) >= 3:
+                # 创建一个填充蒙版
+                mask = np.zeros((img_size, img_size), dtype=np.uint8)
+                # 转换points为numpy数组以便填充
+                points_array = np.array(points, dtype=np.int32)
+                # 填充多边形
+                cv2.fillPoly(mask, [points_array], 255)
+                
+                # 使用蒙版为图形添加半透明填充效果
+                for c in range(3):
+                    # 将填充区域变为略亮的灰色，而不是纯白色
+                    fill_color = 80  # 灰色填充
+                    canvas[:, :, c] = np.where(mask == 255, 
+                                             canvas[:, :, c] * 0.6 + fill_color * 0.4,  # 半透明填充
+                                             canvas[:, :, c])
+                
+                # 重新绘制边界线，使其清晰
+                for j in range(len(points)):
+                    p1 = points[j]
+                    p2 = points[(j + 1) % len(points)]
+                    cv2.line(canvas, p1, p2, (255, 255, 255), 2)
+            
+            # 检查是否需要缩放图像
+            max_width = 800  # 最大宽度
+            max_height = 600  # 最大高度
+            
+            h, w = canvas.shape[:2]
+            if self.debug:
+                self.logger.info(f"几何图形原始大小: {w}x{h}")
+            
+            # 如果图像太大，进行等比例缩放
+            if w > max_width or h > max_height:
+                scale = min(max_width / w, max_height / h)
+                new_w = int(w * scale)
+                new_h = int(h * scale)
+                canvas = cv2.resize(canvas, (new_w, new_h), interpolation=cv2.INTER_AREA)
+                if self.debug:
+                    self.logger.info(f"几何图形缩放后大小: {new_w}x{new_h}")
+            
+            return canvas
+            
+        except Exception as e:
+            self.logger.error(f"渲染几何图形时出错: {str(e)}")
+            # 创建一个默认图像，使用与黑板背景匹配的颜色
+            img = np.ones((200, 200, 3), dtype=np.uint8) * np.array([30, 30, 30], dtype=np.uint8)
+            cv2.putText(img, "Geometry Error", (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            return img 
+
+    def _render_partial_geometry(self, canvas, svg_path, scale_factor, progress):
+        """
+        渲染部分几何图形，用于实现动画绘制效果
+        
+        Args:
+            canvas: 目标画布
+            svg_path: SVG路径字符串
+            scale_factor: 缩放因子
+            progress: 绘制进度（0.0-1.0）
+        """
+        try:
+            # 图像大小
+            img_size = canvas.shape[0]  # 假设是正方形
+            
+            # 解析SVG路径
+            path_commands = svg_path.strip().split(' ')
+            points = []
+            current_point = None
+            
+            # 计算缩放和偏移，使图形居中
+            scale = scale_factor / 100  # 假设SVG坐标在0-100范围内
+            offset_x = img_size // 2
+            offset_y = img_size // 2
+            
+            # 计算总路径点数和当前应绘制的点数
+            total_commands = 0
+            command_indices = []
+            
+            # 预处理，计算点的总数和命令位置
+            i = 0
+            while i < len(path_commands):
+                cmd = path_commands[i]
+                if cmd in ['M', 'm', 'L', 'l']:
+                    total_commands += 1
+                    command_indices.append(i)
+                    i += 3
+                elif cmd in ['A', 'a']:
+                    total_commands += 1
+                    command_indices.append(i)
+                    i += 8
+                elif cmd in ['Z', 'z']:
+                    # Z命令是闭合路径，连接到第一个点
+                    if total_commands > 0:
+                        total_commands += 1
+                        command_indices.append(i)
+                    i += 1
+                else:
+                    i += 1
+            
+            # 计算当前进度下应绘制的命令数
+            commands_to_draw = max(1, int(total_commands * progress))
+            
+            # 只绘制应该显示的命令
+            i = 0
+            points = []
+            current_point = None
+            
+            for cmd_idx in range(min(commands_to_draw, len(command_indices))):
+                i = command_indices[cmd_idx]
+                cmd = path_commands[i]
+                
+                if cmd == 'M' or cmd == 'm':  # 移动
+                    x = float(path_commands[i+1])
+                    y = float(path_commands[i+2])
+                    if cmd == 'M':  # 绝对坐标
+                        current_point = (int(x * scale + offset_x), int(y * scale + offset_y))
+                    else:  # 相对坐标
+                        if current_point:
+                            current_point = (int(current_point[0] + x * scale), int(current_point[1] + y * scale))
+                        else:
+                            current_point = (int(x * scale + offset_x), int(y * scale + offset_y))
+                    points.append(current_point)
+                
+                elif cmd == 'L' or cmd == 'l':  # 线
+                    x = float(path_commands[i+1])
+                    y = float(path_commands[i+2])
+                    if cmd == 'L':  # 绝对坐标
+                        next_point = (int(x * scale + offset_x), int(y * scale + offset_y))
+                    else:  # 相对坐标
+                        next_point = (int(current_point[0] + x * scale), int(current_point[1] + y * scale))
+                    
+                    if current_point and next_point:
+                        cv2.line(canvas, current_point, next_point, (255, 255, 255), 2)
+                    
+                    current_point = next_point
+                    points.append(current_point)
+                
+                elif cmd == 'A' or cmd == 'a':  # 圆弧 (简化处理)
+                    rx = float(path_commands[i+1])
+                    ry = float(path_commands[i+2])
+                    x_axis_rot = float(path_commands[i+3])
+                    large_arc = int(path_commands[i+4])
+                    sweep = int(path_commands[i+5])
+                    x = float(path_commands[i+6])
+                    y = float(path_commands[i+7])
+                    
+                    if cmd == 'A':  # 绝对坐标
+                        next_point = (int(x * scale + offset_x), int(y * scale + offset_y))
+                    else:  # 相对坐标
+                        next_point = (int(current_point[0] + x * scale), int(current_point[1] + y * scale))
+                    
+                    # 绘制直线代替圆弧（简化）
+                    if current_point and next_point:
+                        cv2.line(canvas, current_point, next_point, (255, 255, 255), 2)
+                    
+                    current_point = next_point
+                    points.append(current_point)
+                
+                elif cmd == 'Z' or cmd == 'z':  # 闭合路径
+                    if len(points) > 1 and points[0] != current_point:
+                        cv2.line(canvas, current_point, points[0], (255, 255, 255), 2)
+            
+            # 如果有足够的点来形成一个闭合路径并且进度超过50%，添加填充
+            if len(points) >= 3 and progress > 0.5:
+                # 应用半透明填充
+                mask = np.zeros((img_size, img_size), dtype=np.uint8)
+                points_array = np.array(points, dtype=np.int32)
+                cv2.fillPoly(mask, [points_array], 255)
+                
+                # 计算填充透明度，从0逐渐增加到0.4
+                fill_alpha = min(0.4, (progress - 0.5) * 0.8)  # 在0.5-1.0的进度范围内，透明度从0增加到0.4
+                
+                for c in range(3):
+                    fill_color = 80  # 灰色填充
+                    canvas[:, :, c] = np.where(mask == 255, 
+                                            canvas[:, :, c] * (1 - fill_alpha) + fill_color * fill_alpha,
+                                            canvas[:, :, c])
+                
+                # 重新绘制边界线，确保清晰可见
+                for j in range(len(points) - 1):
+                    cv2.line(canvas, points[j], points[j+1], (255, 255, 255), 2)
+                
+                # 如果是闭合路径，绘制最后一条线
+                if len(points) > 1 and cmd_idx >= len(command_indices) - 1:
+                    cv2.line(canvas, points[-1], points[0], (255, 255, 255), 2)
+            
+            return canvas
+        except Exception as e:
+            self.logger.error(f"渲染部分几何图形时出错: {str(e)}")
+            # 创建一个默认图像
+            cv2.putText(canvas, "Geometry Error", (10, img_size//2), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            return canvas
+
+    def _generate_frame(self, frame_idx):
+        """
+        生成指定帧号的帧
+        
+        Args:
+            frame_idx: 帧号
+            
+        Returns:
+            帧图像
+        """
+        # 创建黑板背景
+        frame = self.background.copy()
+        
+        # 遍历时间轴元素，将可见的元素添加到当前帧
+        for item in self.timeline:
+            start_frame = item['start_frame']
+            end_frame = item['end_frame']
+            
+            # 检查元素是否应该在当前帧中可见
+            if start_frame <= frame_idx < end_frame:
+                content = item['content']
+                pos_x, pos_y = item['position']
+                fade_in_frames = item.get('fade_in_frames', 0)
+                
+                # 计算透明度（用于淡入淡出效果）
+                alpha = 1.0
+                if fade_in_frames > 0 and frame_idx < start_frame + fade_in_frames:
+                    alpha = (frame_idx - start_frame) / fade_in_frames
+                
+                # 处理几何图形动画
+                if item.get('type') == 'geometry' and 'draw_path_frames' in item and item['draw_path_frames'] > 0 and 'svg_path' in item:
+                    draw_path_frames = item['draw_path_frames']
+                    
+                    # 计算绘制动画的进度
+                    if frame_idx < start_frame + draw_path_frames:
+                        relative_frame = frame_idx - start_frame
+                        progress = relative_frame / draw_path_frames
+                        
+                        # 创建临时画布用于渲染部分几何图形
+                        svg_path = item['svg_path']
+                        scale_factor = item.get('scale_factor', 32)
+                        h, w = content.shape[:2]
+                        temp_canvas = np.ones((h, w, 3), dtype=np.uint8) * np.array([30, 30, 30], dtype=np.uint8)
+                        
+                        # 使用部分几何图形渲染方法
+                        self._render_partial_geometry(temp_canvas, svg_path, scale_factor, progress)
+                        
+                        # 合成元素到帧中
+                        self._blend_image_to_frame(frame, temp_canvas, pos_x, pos_y, alpha)
+                    else:
+                        # 合成完整元素到帧中
+                        self._blend_image_to_frame(frame, content, pos_x, pos_y, alpha)
+                else:
+                    # 合成元素到帧中
+                    self._blend_image_to_frame(frame, content, pos_x, pos_y, alpha)
+        
+        return frame 
