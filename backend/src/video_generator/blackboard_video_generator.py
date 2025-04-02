@@ -275,25 +275,30 @@ class BlackboardVideoGenerator:
                         if item['type'] == 'geometry' and 'draw_path_frames' in item and item['draw_path_frames'] > 0 and 'svg_path' in item:
                             draw_path_frames = item['draw_path_frames']
                             
+                            if self.debug:
+                                self.logger.info(f"处理几何图形动画，当前帧: {frame_idx}, 起始帧: {item['start_frame']}, 绘制帧数: {draw_path_frames}")
+                            
                             # 计算绘制动画的进度
-                            if frame_idx < item['start_frame'] + draw_path_frames:
-                                relative_frame = frame_idx - item['start_frame']
-                                progress = relative_frame / draw_path_frames
-                                
-                                # 创建临时画布用于渲染部分几何图形
-                                svg_path = item['svg_path']
-                                scale_factor = item.get('scale_factor', 32)
-                                h, w = content.shape[:2]
-                                temp_canvas = np.ones((h, w, 3), dtype=np.uint8) * np.array([30, 30, 30], dtype=np.uint8)
-                                
-                                # 使用部分几何图形渲染方法
-                                self._render_partial_geometry(temp_canvas, svg_path, scale_factor, progress)
-                                
-                                # 合成元素到帧中
-                                self._blend_image_to_frame(frame, temp_canvas, pos_x, pos_y, alpha)
-                            else:
-                                # 合成完整元素到帧中
-                                self._blend_image_to_frame(frame, content, pos_x, pos_y, alpha)
+                            relative_frame = frame_idx - item['start_frame']
+                            progress = min(1.0, relative_frame / draw_path_frames)
+                            
+                            if self.debug:
+                                self.logger.info(f"使用部分几何图形，动画进度: {progress:.2f}, 相对帧: {relative_frame}")
+                            
+                            # 创建临时画布用于渲染部分几何图形
+                            svg_path = item['svg_path']
+                            scale_factor = item.get('scale_factor', 32)
+                            h, w = content.shape[:2]
+                            temp_canvas = np.ones((h, w, 3), dtype=np.uint8) * np.array([30, 30, 30], dtype=np.uint8)
+                            
+                            if self.debug:
+                                self.logger.info(f"创建临时画布大小: {w}x{h}, SVG路径: {svg_path}, 缩放因子: {scale_factor}")
+                            
+                            # 使用部分几何图形渲染方法
+                            rendered_canvas = self._render_partial_geometry(temp_canvas, svg_path, scale_factor, progress)
+                            
+                            # 将渲染后的画布合成到帧中
+                            self._blend_image_to_frame(frame, rendered_canvas, pos_x, pos_y, alpha)
                         else:
                             # 合成元素到帧中
                             self._blend_image_to_frame(frame, content, pos_x, pos_y, alpha)
@@ -883,13 +888,18 @@ class BlackboardVideoGenerator:
             渲染后的图像
         """
         try:
+            if self.debug:
+                self.logger.info(f"开始渲染几何图形，SVG路径: {svg_path}, 缩放因子: {scale_factor}")
+            
             # 创建一个空白画布 - 使用深灰色背景以匹配黑板
             img_size = 256  # 默认几何图形大小
             canvas = np.ones((img_size, img_size, 3), dtype=np.uint8) * np.array([30, 30, 30], dtype=np.uint8)
             
             # 解析SVG路径
-            # 这里是一个简化版，只支持基本的移动(M)、线(L)和圆弧(A)命令
             path_commands = svg_path.strip().split(' ')
+            if self.debug:
+                self.logger.info(f"解析SVG路径命令: {path_commands}")
+            
             points = []
             current_point = None
             
@@ -897,6 +907,9 @@ class BlackboardVideoGenerator:
             scale = scale_factor / 100  # 假设SVG坐标在0-100范围内
             offset_x = img_size // 2
             offset_y = img_size // 2
+            
+            if self.debug:
+                self.logger.info(f"缩放比例: {scale}, 偏移量: ({offset_x}, {offset_y})")
             
             i = 0
             while i < len(path_commands):
@@ -913,6 +926,8 @@ class BlackboardVideoGenerator:
                         else:
                             current_point = (int(x * scale + offset_x), int(y * scale + offset_y))
                     points.append(current_point)
+                    if self.debug:
+                        self.logger.info(f"移动到点: {current_point}")
                     i += 3
                     
                 elif cmd == 'L' or cmd == 'l':  # 线
@@ -924,46 +939,31 @@ class BlackboardVideoGenerator:
                         next_point = (int(current_point[0] + x * scale), int(current_point[1] + y * scale))
                     
                     if current_point and next_point:
+                        if self.debug:
+                            self.logger.info(f"绘制线段: {current_point} -> {next_point}")
                         cv2.line(canvas, current_point, next_point, (255, 255, 255), 2)
                     
                     current_point = next_point
                     points.append(current_point)
                     i += 3
                     
-                elif cmd == 'A' or cmd == 'a':  # 圆弧 (简化处理)
-                    # 圆弧参数: rx ry x-axis-rotation large-arc-flag sweep-flag x y
-                    rx = float(path_commands[i+1])
-                    ry = float(path_commands[i+2])
-                    x_axis_rot = float(path_commands[i+3])
-                    large_arc = int(path_commands[i+4])
-                    sweep = int(path_commands[i+5])
-                    x = float(path_commands[i+6])
-                    y = float(path_commands[i+7])
-                    
-                    if cmd == 'A':  # 绝对坐标
-                        next_point = (int(x * scale + offset_x), int(y * scale + offset_y))
-                    else:  # 相对坐标
-                        next_point = (int(current_point[0] + x * scale), int(current_point[1] + y * scale))
-                    
-                    # 简化：绘制一条直线来代替圆弧
-                    if current_point and next_point:
-                        cv2.line(canvas, current_point, next_point, (255, 255, 255), 2)
-                    
-                    current_point = next_point
-                    points.append(current_point)
-                    i += 8
-                    
                 elif cmd == 'Z' or cmd == 'z':  # 闭合路径
                     if len(points) > 1 and points[0] != current_point:
+                        if self.debug:
+                            self.logger.info(f"闭合路径: {current_point} -> {points[0]}")
                         cv2.line(canvas, current_point, points[0], (255, 255, 255), 2)
                     i += 1
                     
                 else:
                     # 跳过未识别的命令
+                    if self.debug:
+                        self.logger.warning(f"跳过未识别的命令: {cmd}")
                     i += 1
             
             # 如果有足够的点来形成一个闭合路径，尝试填充
             if len(points) >= 3:
+                if self.debug:
+                    self.logger.info(f"尝试填充多边形，点数: {len(points)}")
                 # 创建一个填充蒙版
                 mask = np.zeros((img_size, img_size), dtype=np.uint8)
                 # 转换points为numpy数组以便填充
@@ -992,6 +992,10 @@ class BlackboardVideoGenerator:
             h, w = canvas.shape[:2]
             if self.debug:
                 self.logger.info(f"几何图形原始大小: {w}x{h}")
+                # 保存调试图像
+                debug_path = "/tmp/geometry_debug.png"
+                cv2.imwrite(debug_path, canvas)
+                self.logger.info(f"保存调试图像到: {debug_path}")
             
             # 如果图像太大，进行等比例缩放
             if w > max_width or h > max_height:
@@ -1009,7 +1013,7 @@ class BlackboardVideoGenerator:
             # 创建一个默认图像，使用与黑板背景匹配的颜色
             img = np.ones((200, 200, 3), dtype=np.uint8) * np.array([30, 30, 30], dtype=np.uint8)
             cv2.putText(img, "Geometry Error", (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-            return img 
+            return img
 
     def _render_partial_geometry(self, canvas, svg_path, scale_factor, progress):
         """
@@ -1020,111 +1024,122 @@ class BlackboardVideoGenerator:
             svg_path: SVG路径字符串
             scale_factor: 缩放因子
             progress: 绘制进度（0.0-1.0）
+            
+        Returns:
+            修改后的画布
         """
         try:
+            if self.debug:
+                self.logger.info(f"开始渲染部分几何图形，进度: {progress:.2f}")
+            
             # 图像大小
             img_size = canvas.shape[0]  # 假设是正方形
             
             # 解析SVG路径
-            path_commands = svg_path.strip().split(' ')
-            points = []
-            current_point = None
+            path_commands = []
+            # 使用正则表达式匹配命令和数字
+            pattern = r'([MLAZmlaz])([^MLAZmlaz]*)'
+            matches = re.finditer(pattern, svg_path)
+            
+            for match in matches:
+                cmd = match.group(1)
+                # 提取参数并转换为浮点数
+                params_str = match.group(2).strip()
+                params = []
+                if params_str:
+                    # 使用正则表达式匹配数字（包括负数和小数）
+                    params = [float(p) for p in re.findall(r'-?\d*\.?\d+', params_str)]
+                path_commands.append((cmd, params))
+            
+            if self.debug:
+                self.logger.info(f"解析后的SVG命令: {path_commands}")
             
             # 计算缩放和偏移，使图形居中
             scale = scale_factor / 100  # 假设SVG坐标在0-100范围内
             offset_x = img_size // 2
             offset_y = img_size // 2
             
-            # 计算总路径点数和当前应绘制的点数
-            total_commands = 0
-            command_indices = []
-            
-            # 预处理，计算点的总数和命令位置
-            i = 0
-            while i < len(path_commands):
-                cmd = path_commands[i]
-                if cmd in ['M', 'm', 'L', 'l']:
-                    total_commands += 1
-                    command_indices.append(i)
-                    i += 3
-                elif cmd in ['A', 'a']:
-                    total_commands += 1
-                    command_indices.append(i)
-                    i += 8
-                elif cmd in ['Z', 'z']:
-                    # Z命令是闭合路径，连接到第一个点
-                    if total_commands > 0:
-                        total_commands += 1
-                        command_indices.append(i)
-                    i += 1
-                else:
-                    i += 1
+            if self.debug:
+                self.logger.info(f"缩放比例: {scale}, 偏移量: ({offset_x}, {offset_y})")
             
             # 计算当前进度下应绘制的命令数
+            total_commands = len(path_commands)
             commands_to_draw = max(1, int(total_commands * progress))
             
+            if self.debug:
+                self.logger.info(f"总命令数: {total_commands}")
+                self.logger.info(f"当前应绘制的命令数: {commands_to_draw}")
+            
             # 只绘制应该显示的命令
-            i = 0
             points = []
             current_point = None
             
-            for cmd_idx in range(min(commands_to_draw, len(command_indices))):
-                i = command_indices[cmd_idx]
-                cmd = path_commands[i]
+            for cmd_idx in range(min(commands_to_draw, total_commands)):
+                cmd, params = path_commands[cmd_idx]
                 
                 if cmd == 'M' or cmd == 'm':  # 移动
-                    x = float(path_commands[i+1])
-                    y = float(path_commands[i+2])
-                    if cmd == 'M':  # 绝对坐标
-                        current_point = (int(x * scale + offset_x), int(y * scale + offset_y))
-                    else:  # 相对坐标
-                        if current_point:
-                            current_point = (int(current_point[0] + x * scale), int(current_point[1] + y * scale))
-                        else:
+                    if len(params) >= 2:
+                        x, y = params[0], params[1]
+                        if cmd == 'M':  # 绝对坐标
                             current_point = (int(x * scale + offset_x), int(y * scale + offset_y))
-                    points.append(current_point)
+                        else:  # 相对坐标
+                            if current_point:
+                                current_point = (int(current_point[0] + x * scale), int(current_point[1] + y * scale))
+                            else:
+                                current_point = (int(x * scale + offset_x), int(y * scale + offset_y))
+                        points.append(current_point)
+                        
+                        if self.debug:
+                            self.logger.info(f"移动到点: {current_point}")
                 
                 elif cmd == 'L' or cmd == 'l':  # 线
-                    x = float(path_commands[i+1])
-                    y = float(path_commands[i+2])
-                    if cmd == 'L':  # 绝对坐标
-                        next_point = (int(x * scale + offset_x), int(y * scale + offset_y))
-                    else:  # 相对坐标
-                        next_point = (int(current_point[0] + x * scale), int(current_point[1] + y * scale))
-                    
-                    if current_point and next_point:
-                        cv2.line(canvas, current_point, next_point, (255, 255, 255), 2)
-                    
-                    current_point = next_point
-                    points.append(current_point)
+                    if len(params) >= 2:
+                        x, y = params[0], params[1]
+                        if cmd == 'L':  # 绝对坐标
+                            next_point = (int(x * scale + offset_x), int(y * scale + offset_y))
+                        else:  # 相对坐标
+                            next_point = (int(current_point[0] + x * scale), int(current_point[1] + y * scale))
+                        
+                        if current_point and next_point:
+                            if self.debug:
+                                self.logger.info(f"绘制线段: {current_point} -> {next_point}")
+                            cv2.line(canvas, current_point, next_point, (255, 255, 255), 2)
+                        
+                        current_point = next_point
+                        points.append(current_point)
                 
                 elif cmd == 'A' or cmd == 'a':  # 圆弧 (简化处理)
-                    rx = float(path_commands[i+1])
-                    ry = float(path_commands[i+2])
-                    x_axis_rot = float(path_commands[i+3])
-                    large_arc = int(path_commands[i+4])
-                    sweep = int(path_commands[i+5])
-                    x = float(path_commands[i+6])
-                    y = float(path_commands[i+7])
-                    
-                    if cmd == 'A':  # 绝对坐标
-                        next_point = (int(x * scale + offset_x), int(y * scale + offset_y))
-                    else:  # 相对坐标
-                        next_point = (int(current_point[0] + x * scale), int(current_point[1] + y * scale))
-                    
-                    # 绘制直线代替圆弧（简化）
-                    if current_point and next_point:
-                        cv2.line(canvas, current_point, next_point, (255, 255, 255), 2)
-                    
-                    current_point = next_point
-                    points.append(current_point)
+                    if len(params) >= 7:
+                        rx, ry = params[0], params[1]
+                        x_axis_rot = params[2]
+                        large_arc = int(params[3])
+                        sweep = int(params[4])
+                        x, y = params[5], params[6]
+                        
+                        if cmd == 'A':  # 绝对坐标
+                            next_point = (int(x * scale + offset_x), int(y * scale + offset_y))
+                        else:  # 相对坐标
+                            next_point = (int(current_point[0] + x * scale), int(current_point[1] + y * scale))
+                        
+                        # 绘制直线代替圆弧（简化）
+                        if current_point and next_point:
+                            if self.debug:
+                                self.logger.info(f"绘制圆弧（简化为直线）: {current_point} -> {next_point}")
+                            cv2.line(canvas, current_point, next_point, (255, 255, 255), 2)
+                        
+                        current_point = next_point
+                        points.append(current_point)
                 
                 elif cmd == 'Z' or cmd == 'z':  # 闭合路径
                     if len(points) > 1 and points[0] != current_point:
+                        if self.debug:
+                            self.logger.info(f"闭合路径: {current_point} -> {points[0]}")
                         cv2.line(canvas, current_point, points[0], (255, 255, 255), 2)
             
             # 如果有足够的点来形成一个闭合路径并且进度超过50%，添加填充
             if len(points) >= 3 and progress > 0.5:
+                if self.debug:
+                    self.logger.info("添加填充效果")
                 # 应用半透明填充
                 mask = np.zeros((img_size, img_size), dtype=np.uint8)
                 points_array = np.array(points, dtype=np.int32)
@@ -1144,14 +1159,19 @@ class BlackboardVideoGenerator:
                     cv2.line(canvas, points[j], points[j+1], (255, 255, 255), 2)
                 
                 # 如果是闭合路径，绘制最后一条线
-                if len(points) > 1 and cmd_idx >= len(command_indices) - 1:
+                if len(points) > 1 and cmd_idx >= len(path_commands) - 1:
                     cv2.line(canvas, points[-1], points[0], (255, 255, 255), 2)
             
+            if self.debug:
+                self.logger.info("部分几何图形渲染完成")
+            
             return canvas
+            
         except Exception as e:
             self.logger.error(f"渲染部分几何图形时出错: {str(e)}")
-            # 创建一个默认图像
-            cv2.putText(canvas, "Geometry Error", (10, img_size//2), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            # 在出错时，在画布上显示错误信息
+            cv2.putText(canvas, "Geometry Error", (10, canvas.shape[0]//2), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
             return canvas
 
     def _generate_frame(self, frame_idx):
@@ -1184,13 +1204,19 @@ class BlackboardVideoGenerator:
                     alpha = (frame_idx - start_frame) / fade_in_frames
                 
                 # 处理几何图形动画
-                if item.get('type') == 'geometry' and 'draw_path_frames' in item and item['draw_path_frames'] > 0 and 'svg_path' in item:
+                if item['type'] == 'geometry' and 'draw_path_frames' in item and item['draw_path_frames'] > 0 and 'svg_path' in item:
                     draw_path_frames = item['draw_path_frames']
                     
+                    if self.debug:
+                        self.logger.info(f"处理几何图形动画，当前帧: {frame_idx}, 起始帧: {item['start_frame']}, 绘制帧数: {draw_path_frames}")
+                    
                     # 计算绘制动画的进度
-                    if frame_idx < start_frame + draw_path_frames:
-                        relative_frame = frame_idx - start_frame
+                    relative_frame = frame_idx - item['start_frame']
+                    if relative_frame < draw_path_frames:
                         progress = relative_frame / draw_path_frames
+                        
+                        if self.debug:
+                            self.logger.info(f"使用部分几何图形，动画进度: {progress:.2f}, 相对帧: {relative_frame}")
                         
                         # 创建临时画布用于渲染部分几何图形
                         svg_path = item['svg_path']
@@ -1198,12 +1224,17 @@ class BlackboardVideoGenerator:
                         h, w = content.shape[:2]
                         temp_canvas = np.ones((h, w, 3), dtype=np.uint8) * np.array([30, 30, 30], dtype=np.uint8)
                         
-                        # 使用部分几何图形渲染方法
-                        self._render_partial_geometry(temp_canvas, svg_path, scale_factor, progress)
+                        if self.debug:
+                            self.logger.info(f"创建临时画布大小: {w}x{h}, SVG路径: {svg_path}, 缩放因子: {scale_factor}")
                         
-                        # 合成元素到帧中
-                        self._blend_image_to_frame(frame, temp_canvas, pos_x, pos_y, alpha)
+                        # 使用部分几何图形渲染方法
+                        rendered_canvas = self._render_partial_geometry(temp_canvas, svg_path, scale_factor, progress)
+                        
+                        # 将渲染后的画布合成到帧中
+                        self._blend_image_to_frame(frame, rendered_canvas, pos_x, pos_y, alpha)
                     else:
+                        if self.debug:
+                            self.logger.info("使用完整几何图形")
                         # 合成完整元素到帧中
                         self._blend_image_to_frame(frame, content, pos_x, pos_y, alpha)
                 else:

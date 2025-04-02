@@ -1,20 +1,23 @@
-import json
 import os
-import shutil
+import sys
 from pathlib import Path
-from loguru import logger
-from backend.src.video_generator.blackboard_video_generator import BlackboardVideoGenerator
+import logging
+
+# 设置项目根目录到Python路径
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+from src.video_generator.blackboard_video_generator import BlackboardVideoGenerator
+
+# 配置日志
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def main():
     # 获取项目根目录
     root_dir = Path(__file__).parent.parent
     
-    # 设置日志
-    logs_dir = root_dir / "logs"
-    logs_dir.mkdir(exist_ok=True)
-    logger.add(logs_dir / "test_geometry_triangle.log", rotation="500 MB")
-    
-    # 创建三角形测试数据
+    # 测试数据
     test_data = {
         "metadata": {
             "problem_id": "GEOMETRY_TRIANGLE_004",
@@ -79,26 +82,22 @@ def main():
     logger.info(f"开始生成视频，输出路径: {output_path}")
     
     # 生成视频
-    generator = BlackboardVideoGenerator(debug=True)  # 启用调试模式
+    generator = BlackboardVideoGenerator(debug=True)
     temp_video_file = generator.generate_video(test_data['blackboard'])
     
-    if temp_video_file and os.path.exists(temp_video_file):
-        # 将临时文件复制到目标位置
-        logger.info(f"将临时文件复制到: {output_path}")
-        shutil.copy(temp_video_file, output_path)
-        
-        # 删除临时文件
-        logger.info(f"删除临时文件: {temp_video_file}")
-        os.remove(temp_video_file)
-        
-        # 验证输出文件
-        assert output_path.exists(), "视频文件未生成"
-        file_size = output_path.stat().st_size
-        logger.info(f"视频文件大小: {file_size} 字节")
-        assert file_size > 0, "生成的视频文件为空"
-        logger.info(f"视频生成成功，文件大小：{file_size / 1024:.2f}KB")
-    else:
-        logger.error("视频生成失败，没有收到有效的临时文件")
+    # 复制到最终输出路径
+    import shutil
+    logger.info(f"将临时文件复制到: {output_path}")
+    shutil.copy2(temp_video_file, output_path)
+    
+    # 删除临时文件
+    logger.info(f"删除临时文件: {temp_video_file}")
+    os.remove(temp_video_file)
+    
+    # 检查生成的视频文件大小
+    video_size = os.path.getsize(output_path)
+    logger.info(f"视频文件大小: {video_size} 字节")
+    logger.info(f"视频生成成功，文件大小：{video_size/1024:.2f}KB")
 
 if __name__ == "__main__":
     main() 

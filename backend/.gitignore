@@ -1,0 +1,1 @@
+# Python\n__pycache__/\n*.py[cod]\n*$py.class\n*.so\n.Python\nbuild/\ndevelop-eggs/\ndist/\ndownloads/\neggs/\n.eggs/\nlib/\nlib64/\nparts/\nsdist/\nvar/\nwheels/\n*.egg-info/\n.installed.cfg\n*.egg\n\n# Logs and output\nlogs/\noutput/\nsamples/\n\n# IDE\n.idea/\n.vscode/\n*.swp\n*.swo\n\n# Other\nfix_indentation.py\nscreenshot_check.png
