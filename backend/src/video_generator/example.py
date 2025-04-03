@@ -1,7 +1,8 @@
 import json
 from pathlib import Path
 from loguru import logger
-from .blackboard_video_generator import BlackboardVideoGenerator
+from blackboard_video_generator import BlackboardVideoGenerator
+import sys
 
 def generate_blackboard_video(json_path: str, output_path: str):
     """
@@ -33,16 +34,12 @@ def generate_blackboard_video(json_path: str, output_path: str):
         
         # 保存视频
         logger.info("开始保存视频...")
-        video.write_videofile(
-            output_path,
-            fps=30,
-            codec='libx264',
-            audio=False,
-            threads=4,
-            preset='medium',  # 使用中等压缩预设
-            bitrate='5000k'  # 设置比特率
-        )
-        
+        if isinstance(video, str):  # 如果返回的是临时文件路径
+            import shutil
+            shutil.copy2(video, output_path)
+        else:  # 如果返回的是视频对象
+            video.release()
+            
         logger.info(f"视频已生成: {output_path}")
         
     except Exception as e:
@@ -50,9 +47,12 @@ def generate_blackboard_video(json_path: str, output_path: str):
         raise
 
 if __name__ == '__main__':
-    # 示例用法
-    json_path = 'samples/math_problems/sample_math_problem_001.json'
-    output_path = 'output/blackboard_video.mp4'
+    if len(sys.argv) != 3:
+        print("用法: python example.py <输入JSON文件路径> <输出视频文件路径>")
+        sys.exit(1)
+        
+    json_path = sys.argv[1]
+    output_path = sys.argv[2]
     
     # 确保输出目录存在
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)

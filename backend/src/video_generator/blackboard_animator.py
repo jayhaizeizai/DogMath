@@ -286,27 +286,174 @@ class BlackboardAnimator:
             self.logger.error(f"SVG路径解析失败: {str(e)}")
             return []
         
-    def _create_animation_effect(self, 
-                               animation_config: Dict,
-                               image: np.ndarray) -> Optional[AnimationEffect]:
-        """创建动画效果"""
-        effect_type = animation_config.get("enter")
-        duration = animation_config.get("duration", 1.0)
+    def _create_animation_effect(self, animation: Dict, image: np.ndarray) -> Optional[AnimationEffect]:
+        """
+        创建动画效果
         
-        if effect_type == "fade_in":
-            return FadeInEffect(duration)
-        elif effect_type == "fade_out":
-            return FadeOutEffect(duration)
-        elif effect_type == "slide_in_left":
-            return SlideInLeftEffect(duration)
-        elif effect_type == "slide_in_right":
-            return SlideInRightEffect(duration)
-        elif effect_type == "highlight":
-            return HighlightEffect(duration)
-        elif effect_type == "draw_path":
-            return DrawPathEffect(duration, [])  # 路径数据需要单独处理
+        Args:
+            animation: 动画配置
+            image: 目标图像
             
-        return None
+        Returns:
+            动画效果对象
+        """
+        try:
+            effect_type = animation.get('enter', 'fade_in')
+            duration = animation.get('duration', 1.0)
+            
+            if effect_type == 'fade_in':
+                return FadeInEffect(duration)
+            elif effect_type == 'slide_in_left':
+                return SlideInEffect(duration, 'left')
+            elif effect_type == 'slide_in_right':
+                return SlideInEffect(duration, 'right')
+            elif effect_type == 'slide_in_up':
+                return SlideInEffect(duration, 'up')
+            elif effect_type == 'slide_in_down':
+                return SlideInEffect(duration, 'down')
+            elif effect_type == 'scale_in':
+                return ScaleInEffect(duration)
+            elif effect_type == 'rotate_in':
+                return RotateInEffect(duration)
+            elif effect_type == 'draw_path':
+                return DrawPathEffect(duration)
+            elif effect_type == 'write_text':
+                return WriteTextEffect(duration)
+            elif effect_type == 'bounce_in':
+                return BounceInEffect(duration)
+            elif effect_type == 'elastic_in':
+                return ElasticInEffect(duration)
+            else:
+                self.logger.warning(f"未知的动画效果类型: {effect_type}")
+                return None
+            
+        except Exception as e:
+            self.logger.error(f"创建动画效果时出错: {str(e)}")
+            return None
+
+class AnimationEffect:
+    """动画效果基类"""
+    def __init__(self, duration: float):
+        self.duration = duration
+        self.progress = 0.0
+        
+    def update(self, delta_time: float) -> bool:
+        """更新动画进度"""
+        self.progress = min(1.0, self.progress + delta_time / self.duration)
+        return self.progress < 1.0
+        
+    def apply(self, image: np.ndarray) -> np.ndarray:
+        """应用动画效果"""
+        raise NotImplementedError
+
+class FadeInEffect(AnimationEffect):
+    """淡入效果"""
+    def apply(self, image: np.ndarray) -> np.ndarray:
+        alpha = self.progress
+        return cv2.addWeighted(image, alpha, np.zeros_like(image), 1 - alpha, 0)
+
+class SlideInEffect(AnimationEffect):
+    """滑入效果"""
+    def __init__(self, duration: float, direction: str):
+        super().__init__(duration)
+        self.direction = direction
+        
+    def apply(self, image: np.ndarray) -> np.ndarray:
+        h, w = image.shape[:2]
+        offset = int((1 - self.progress) * max(h, w))
+        
+        if self.direction == 'left':
+            return np.roll(image, -offset, axis=1)
+        elif self.direction == 'right':
+            return np.roll(image, offset, axis=1)
+        elif self.direction == 'up':
+            return np.roll(image, -offset, axis=0)
+        else:  # down
+            return np.roll(image, offset, axis=0)
+
+class ScaleInEffect(AnimationEffect):
+    """缩放效果"""
+    def apply(self, image: np.ndarray) -> np.ndarray:
+        h, w = image.shape[:2]
+        scale = self.progress
+        new_w = int(w * scale)
+        new_h = int(h * scale)
+        
+        if new_w == 0 or new_h == 0:
+            return image
+            
+        scaled = cv2.resize(image, (new_w, new_h))
+        result = np.zeros_like(image)
+        
+        y_offset = (h - new_h) // 2
+        x_offset = (w - new_w) // 2
+        result[y_offset:y_offset+new_h, x_offset:x_offset+new_w] = scaled
+        
+        return result
+
+class RotateInEffect(AnimationEffect):
+    """旋转效果"""
+    def apply(self, image: np.ndarray) -> np.ndarray:
+        h, w = image.shape[:2]
+        center = (w // 2, h // 2)
+        angle = (1 - self.progress) * 360
+        
+        matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
+        return cv2.warpAffine(image, matrix, (w, h))
+
+class BounceInEffect(AnimationEffect):
+    """弹跳效果"""
+    def apply(self, image: np.ndarray) -> np.ndarray:
+        # 使用缓动函数
+        t = self.progress
+        if t < 0.5:
+            scale = 2 * t * t
+        else:
+            scale = 1 - pow(-2 * t + 2, 2) / 2
+            
+        h, w = image.shape[:2]
+        new_w = int(w * scale)
+        new_h = int(h * scale)
+        
+        if new_w == 0 or new_h == 0:
+            return image
+            
+        scaled = cv2.resize(image, (new_w, new_h))
+        result = np.zeros_like(image)
+        
+        y_offset = (h - new_h) // 2
+        x_offset = (w - new_w) // 2
+        result[y_offset:y_offset+new_h, x_offset:x_offset+new_w] = scaled
+        
+        return result
+
+class ElasticInEffect(AnimationEffect):
+    """弹性效果"""
+    def apply(self, image: np.ndarray) -> np.ndarray:
+        # 使用弹性缓动函数
+        t = self.progress
+        if t == 0:
+            scale = 0
+        elif t == 1:
+            scale = 1
+        else:
+            scale = pow(2, -10 * t) * sin((t * 10 - 0.75) * (2 * pi / 3)) + 1
+            
+        h, w = image.shape[:2]
+        new_w = int(w * scale)
+        new_h = int(h * scale)
+        
+        if new_w == 0 or new_h == 0:
+            return image
+            
+        scaled = cv2.resize(image, (new_w, new_h))
+        result = np.zeros_like(image)
+        
+        y_offset = (h - new_h) // 2
+        x_offset = (w - new_w) // 2
+        result[y_offset:y_offset+new_h, x_offset:x_offset+new_w] = scaled
+        
+        return result
         
     def create_animation(self, 
                         script: Dict,
@@ -381,7 +528,7 @@ class BlackboardAnimator:
                     # 应用动画效果
                     frame = current_frame.copy()
                     for element_id, effect in animated_elements.items():
-                        frame = effect.apply(frame, effect.progress)
+                        frame = effect.apply(frame)
                         
                     out.write(frame)
                     

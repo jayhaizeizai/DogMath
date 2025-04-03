@@ -1,150 +1,238 @@
 {
   "metadata": {
     "problem_id": "CIRCLE_CHORD_001",
-    "source_image": "sample_math_problem_001.jpeg",
+    "source_image": "math_problem_001.png",
     "difficulty": "medium",
-    "estimated_duration": 280,
-    "knowledge_tags": ["圆的性质", "勾股定理", "垂直半径定理"],
-    "created_at": "2024-04-01T00:00:00Z"
+    "estimated_duration": 120,
+    "knowledge_tags": ["circle", "chord", "perpendicular_radius", "pythagorean_theorem"],
+    "created_at": "2023-10-01T10:00:00Z"
   },
   "blackboard": {
-    "background": "classic_blackboard",
+    "background": "dark",
     "resolution": [1920, 1080],
     "steps": [
       {
         "step_id": 1,
-        "title": "题目解析",
-        "duration": 25,
+        "title": "题目分析",
+        "duration": 30,
         "elements": [
           {
             "type": "geometry",
-            "content": "M0 0 L100 0 A50 50 0 0 1 100 100 L0 100 Z",
-            "position": [50, 40],
-            "font_size": 32,
+            "content": {
+              "circle": {
+                "path": "M 500 500 m -400, 0 a 400,400 0 1,0 800,0 a 400,400 0 1,0 -800,0",
+                "style": {
+                  "stroke": "white",
+                  "stroke-width": 4,
+                  "fill": "none"
+                }
+              },
+              "chord": {
+                "path": "M 100 500 L 900 500",
+                "style": {
+                  "stroke": "white",
+                  "stroke-width": 4
+                }
+              },
+              "radius": {
+                "path": "M 500 500 L 500 100",
+                "style": {
+                  "stroke": "white",
+                  "stroke-width": 4,
+                  "stroke-dasharray": "5,5"
+                }
+              },
+              "perpendicular": {
+                "path": "M 500 500 L 500 500 m -200, 0 L 500 500 m 200, 0",
+                "style": {
+                  "stroke": "white",
+                  "stroke-width": 4,
+                  "stroke-dasharray": "5,5"
+                }
+              }
+            },
+            "position": [500, 500],
+            "scale": 1.0,
             "animation": {
               "enter": "draw_path",
-              "exit": "fade_out",
-              "duration": 8
+              "duration": 3
             }
           },
           {
             "type": "text",
-            "content": "已知条件：",
-            "position": [10, 10],
-            "font_size": 28,
+            "content": "⊙O 的半径 OA 等于 5，半径 OC 与弦 AB 垂直，垂足为 D，若 OD = 3，求弦 AB 的长。",
+            "position": [200, 100],
+            "font_size": 32,
             "animation": {
               "enter": "fade_in",
-              "exit": "fade_out",
               "duration": 1
             }
           },
           {
             "type": "formula",
-            "content": "OA=5,\\quad OD=3",
-            "position": [15, 20],
-            "font_size": 32,
+            "content": "\\begin{cases} OA = 5 \\\\ OD = 3 \\end{cases}",
+            "position": [200, 150],
+            "font_size": 36,
             "animation": {
               "enter": "slide_in_left",
-              "exit": "fade_out",
-              "duration": 1
+              "duration": 1.5
             }
           }
         ]
       },
       {
         "step_id": 2,
-        "title": "构建直角三角形",
-        "duration": 40,
+        "title": "解题步骤",
+        "duration": 60,
         "elements": [
           {
-            "type": "formula",
-            "content": "\\triangle OAD",
-            "position": [30, 50],
+            "type": "text",
+            "content": "根据垂径定理，OC 垂直平分 AB，设 AD = DB = x。",
+            "position": [200, 100],
             "font_size": 32,
             "animation": {
-              "enter": "highlight",
-              "exit": "fade_out",
+              "enter": "fade_in",
               "duration": 1
             }
           },
           {
-            "type": "text",
-            "content": "关键定理：",
-            "position": [65, 30],
-            "font_size": 24,
+            "type": "formula",
+            "content": "AD = DB = x",
+            "position": [200, 150],
+            "font_size": 36,
             "animation": {
-              "enter": "fade_in",
-              "exit": "fade_out",
-              "duration": 1
+              "enter": "slide_in_left",
+              "duration": 1.5
+            }
+          },
+          {
+            "type": "geometry",
+            "content": {
+              "triangle": {
+                "path": "M 500 500 L 500 100 L 300 500 Z",
+                "style": {
+                  "stroke": "white",
+                  "stroke-width": 4,
+                  "fill": "rgba(255, 255, 255, 0.2)"
+                }
+              },
+              "label": {
+                "path": "M 500 500 m 0, -50",
+                "content": "O",
+                "style": {
+                  "fill": "white",
+                  "font-size": 32
+                }
+              },
+              "label": {
+                "path": "M 500 100 m 0, -20",
+                "content": "D",
+                "style": {
+                  "fill": "white",
+                  "font-size": 32
+                }
+              },
+              "label": {
+                "path": "M 300 500 m -50, 0",
+                "content": "A",
+                "style": {
+                  "fill": "white",
+                  "font-size": 32
+                }
+              }
+            },
+            "position": [500, 500],
+            "scale": 1.0,
+            "animation": {
+              "enter": "draw_path",
+              "duration": 2
             }
           },
           {
             "type": "formula",
             "content": "OA^2 = OD^2 + AD^2",
-            "position": [65, 40],
-            "font_size": 32,
+            "position": [200, 200],
+            "font_size": 36,
             "animation": {
               "enter": "slide_in_left",
-              "exit": "fade_out",
-              "duration": 1
+              "duration": 1.5
+            }
+          },
+          {
+            "type": "formula",
+            "content": "5^2 = 3^2 + x^2",
+            "position": [200, 250],
+            "font_size": 36,
+            "animation": {
+              "enter": "slide_in_left",
+              "duration": 1.5
+            }
+          },
+          {
+            "type": "formula",
+            "content": "25 = 9 + x^2",
+            "position": [200, 300],
+            "font_size": 36,
+            "animation": {
+              "enter": "slide_in_left",
+              "duration": 1.5
+            }
+          },
+          {
+            "type": "formula",
+            "content": "x^2 = 16",
+            "position": [200, 350],
+            "font_size": 36,
+            "animation": {
+              "enter": "slide_in_left",
+              "duration": 1.5
+            }
+          },
+          {
+            "type": "formula",
+            "content": "x = 4",
+            "position": [200, 400],
+            "font_size": 36,
+            "animation": {
+              "enter": "slide_in_left",
+              "duration": 1.5
+            }
+          },
+          {
+            "type": "formula",
+            "content": "AB = 2x = 2 \\times 4 = 8",
+            "position": [200, 450],
+            "font_size": 36,
+            "animation": {
+              "enter": "slide_in_left",
+              "duration": 1.5
             }
           }
         ]
       },
       {
         "step_id": 3,
-        "title": "代入计算",
-        "duration": 60,
-        "elements": [
-          {
-            "type": "formula",
-            "content": "5^2 = 3^2 + AD^2 \\\\ 25 = 9 + AD^2",
-            "position": [30, 60],
-            "font_size": 32,
-            "animation": {
-              "enter": "slide_in_left",
-              "exit": "fade_out",
-              "duration": 1
-            }
-          },
-          {
-            "type": "formula",
-            "content": "AD^2 = 16 \\Rightarrow AD = 4",
-            "position": [30, 70],
-            "font_size": 32,
-            "animation": {
-              "enter": "slide_in_left",
-              "exit": "fade_out",
-              "duration": 1
-            }
-          }
-        ]
-      },
-      {
-        "step_id": 4,
-        "title": "求解弦长",
+        "title": "最终答案",
         "duration": 30,
         "elements": [
           {
-            "type": "formula",
-            "content": "AB = 2 \\times AD = 8",
-            "position": [50, 80],
-            "font_size": 36,
+            "type": "text",
+            "content": "因此，弦 AB 的长度为 8。",
+            "position": [200, 100],
+            "font_size": 32,
             "animation": {
-              "enter": "slide_in_left",
-              "exit": "fade_out",
+              "enter": "fade_in",
               "duration": 1
             }
           },
           {
-            "type": "text",
-            "content": "选项B正确",
-            "position": [70, 90],
-            "font_size": 36,
+            "type": "formula",
+            "content": "\\boxed{AB = 8}",
+            "position": [200, 150],
+            "font_size": 48,
             "animation": {
-              "enter": "highlight",
-              "exit": "fade_out",
-              "duration": 1
+              "enter": "slide_in_left",
+              "duration": 1.5
             }
           }
         ]
@@ -154,64 +242,98 @@
   "audio": {
     "narration": [
       {
-        "text": "我们现在看到的是一个经典的圆弦长计算问题。题目给出圆的半径OA为5，半径OC与弦AB垂直且OD=3。",
+        "text": "我们来解这道关于圆的问题。题目给出：⊙O 的半径 OA 等于 5，半径 OC 与弦 AB 垂直，垂足为 D，且 OD 的长度为 3。要求我们求弦 AB 的长度。",
         "start_time": 0,
-        "end_time": 12,
+        "end_time": 10,
         "voice_config": {
-          "speaker": "teacher_female",
+          "speaker": "teacher_male",
           "speed": 1.0,
           "pitch": 1.0
-        },
-        "ssml": "<speak>我们现在看到的是一个经典的圆弦长计算问题。题目给出圆的半径<say-as interpret-as=\"math\">OA=5</say-as>，半径<say-as interpret-as=\"math\">OC</say-as>与弦<say-as interpret-as=\"math\">AB</say-as>垂直且<say-as interpret-as=\"math\">OD=3</say-as>。</speak>"
+        }
       },
       {
-        "text": "注意这里的关键是发现直角三角形OAD。根据勾股定理，OA平方等于OD平方加上AD平方。",
-        "start_time": 15,
-        "end_time": 27,
+        "text": "根据垂径定理，半径 OC 垂直平分弦 AB，设 AD 和 DB 的长度都为 x。",
+        "start_time": 10,
+        "end_time": 18,
         "voice_config": {
-          "speaker": "teacher_female",
+          "speaker": "teacher_male",
           "speed": 1.0,
           "pitch": 1.0
-        },
-        "ssml": "<speak>注意这里的关键是发现直角三角形<say-as interpret-as=\"math\">OAD</say-as>。根据<emphasis>勾股定理</emphasis>，<say-as interpret-as=\"math\">OA^2 = OD^2 + AD^2</say-as>。</speak>"
+        }
       },
       {
-        "text": "代入数值计算：5的平方等于3的平方加AD平方，得到AD等于4。这里特别注意平方根只取正值，因为长度不能为负。",
-        "start_time": 30,
-        "end_time": 49,
+        "text": "在直角三角形 OAD 中，根据勾股定理，OA 的平方等于 OD 的平方加上 AD 的平方。",
+        "start_time": 18,
+        "end_time": 28,
         "voice_config": {
-          "speaker": "teacher_female",
+          "speaker": "teacher_male",
           "speed": 1.0,
           "pitch": 1.0
-        },
-        "ssml": "<speak>代入数值计算：<say-as interpret-as=\"math\">5^2 = 3^2 + AD^2</say-as>，得到<say-as interpret-as=\"math\">AD = 4</say-as>。这里特别注意平方根只取正值，因为长度不能为负。</speak>"
+        }
       },
       {
-        "text": "最后，由于D是AB的中点，弦长AB就是AD的两倍，也就是8。因此正确选项是B。",
-        "start_time": 50,
-        "end_time": 65,
+        "text": "代入已知数据，5 的平方等于 3 的平方加上 x 的平方。",
+        "start_time": 28,
+        "end_time": 35,
         "voice_config": {
-          "speaker": "teacher_female",
+          "speaker": "teacher_male",
           "speed": 1.0,
           "pitch": 1.0
-        },
-        "ssml": "<speak>最后，由于<say-as interpret-as=\"math\">D</say-as>是<say-as interpret-as=\"math\">AB</say-as>的中点，弦长<say-as interpret-as=\"math\">AB</say-as>就是<say-as interpret-as=\"math\">AD</say-as>的两倍，也就是<say-as interpret-as=\"math\">8</say-as>。因此正确选项是<emphasis>B</emphasis>。</speak>"
+        }
+      },
+      {
+        "text": "计算可得，25 等于 9 加上 x 的平方，从而 x 的平方等于 16，x 等于 4。",
+        "start_time": 35,
+        "end_time": 45,
+        "voice_config": {
+          "speaker": "teacher_male",
+          "speed": 1.0,
+          "pitch": 1.0
+        }
+      },
+      {
+        "text": "因为 AD 和 DB 的长度都为 x，所以弦 AB 的长度为 2x，即 2 乘以 4，等于 8。",
+        "start_time": 45,
+        "end_time": 55,
+        "voice_config": {
+          "speaker": "teacher_male",
+          "speed": 1.0,
+          "pitch": 1.0
+        }
+      },
+      {
+        "text": "因此，弦 AB 的长度为 8。",
+        "start_time": 55,
+        "end_time": 60,
+        "voice_config": {
+          "speaker": "teacher_male",
+          "speed": 1.0,
+          "pitch": 1.0
+        }
       }
     ],
-    "background_music": "soft_classroom"
+    "background_music": "relaxing_music.mp3"
   },
   "annotations": {
     "key_points": [
       {
-        "timestamp": 27,
-        "concept": "垂直半径定理",
-        "reference_link": "https://example.com/math/perpendicular-radius"
+        "text": "垂径定理：半径垂直平分弦",
+        "position": [200, 100],
+        "font_size": 24,
+        "animation": {
+          "enter": "highlight",
+          "duration": 1
+        }
       },
       {
-        "timestamp": 45,
-        "concept": "算术平方根",
-        "reference_link": "https://example.com/math/square-root"
+        "text": "勾股定理：直角三角形中，斜边的平方等于两直角边的平方和",
+        "position": [200, 150],
+        "font_size": 24,
+        "animation": {
+          "enter": "highlight",
+          "duration": 1
+        }
       }
     ]
   }
-} 
+}

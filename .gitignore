@@ -38,6 +38,7 @@ Thumbs.db
 # 日志和输出
 logs/
 output/
+samples/
 
 # 其他
 fix_indentation.py
