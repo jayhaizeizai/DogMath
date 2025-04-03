@@ -33,4 +33,12 @@ ENV/
 
 # OS
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# 日志和输出
+logs/
+output/
+
+# 其他
+fix_indentation.py
+screenshot_check.png 
