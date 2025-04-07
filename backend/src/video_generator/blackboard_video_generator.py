@@ -200,51 +200,73 @@ class BlackboardVideoGenerator:
         return background
     
     def _blend_image_to_frame(self, frame: np.ndarray, img: np.ndarray, x: int, y: int, alpha: float = 1.0):
-        """将图像混合到帧中"""
-        h, w = img.shape[:2]
-        frame_h, frame_w = frame.shape[:2]
+        """
+        将图像混合到帧中
         
-        # 计算有效的源图像区域和目标区域
-        src_x = max(0, -x)
-        src_y = max(0, -y)
-        src_w = min(w - src_x, frame_w - max(0, x))
-        src_h = min(h - src_y, frame_h - max(0, y))
-        
-        # 如果没有有效区域，直接返回
-        if src_w <= 0 or src_h <= 0:
-            return
-        
-        # 计算目标区域
-        dst_x = max(0, x)
-        dst_y = max(0, y)
-        
-        # 获取源图像和目标区域
-        src_roi = img[src_y:src_y+src_h, src_x:src_x+src_w]
-        dst_roi = frame[dst_y:dst_y+src_h, dst_x:dst_x+src_w]
-        
-        # 如果源图像有alpha通道，使用它进行混合
-        if len(src_roi.shape) == 3 and src_roi.shape[2] == 4:
-            # 提取alpha通道并调整为0-1范围
-            src_alpha = src_roi[:, :, 3] / 255.0 * alpha
-            src_alpha = src_alpha[..., np.newaxis]  # 添加通道维度
+        Args:
+            frame: 目标帧
+            img: 要混合的图像
+            x: x坐标（中心点）
+            y: y坐标（中心点）
+            alpha: 透明度
+        """
+        try:
+            if img is None:
+                return
+                
+            # 获取图像尺寸
+            img_h, img_w = img.shape[:2]
+            frame_h, frame_w = frame.shape[:2]
             
-            # 混合RGB通道
-            dst_roi[:] = (src_roi[:, :, :3] * src_alpha + dst_roi * (1 - src_alpha)).astype(np.uint8)
-        else:
-            # 如果没有alpha通道，使用全局alpha值进行混合
-            # 创建一个与源图像形状相同的alpha遮罩
-            alpha_mask = np.zeros(src_roi.shape[:2], dtype=np.float32)
+            # 计算图像的实际位置（中心对齐）
+            x = int(x - img_w / 2)
+            y = int(y - img_h / 2)
             
-            # 找到非黑色像素（认为是内容区域）
-            content_mask = np.any(src_roi > 30, axis=-1)
-            alpha_mask[content_mask] = alpha
+            # 确保坐标在有效范围内
+            x = max(0, min(x, frame_w - img_w))
+            y = max(0, min(y, frame_h - img_h))
             
-            # 添加通道维度
-            alpha_mask = alpha_mask[..., np.newaxis]
+            # 计算重叠区域
+            x1, y1 = max(0, x), max(0, y)
+            x2, y2 = min(frame_w, x + img_w), min(frame_h, y + img_h)
             
-            # 混合RGB通道，只对内容区域应用alpha混合
-            dst_roi[:] = (src_roi * alpha_mask + dst_roi * (1 - alpha_mask)).astype(np.uint8)
+            # 计算源图像的对应区域
+            src_x1, src_y1 = max(0, -x), max(0, -y)
+            src_x2, src_y2 = src_x1 + (x2 - x1), src_y1 + (y2 - y1)
             
+            # 检查是否有重叠区域
+            if x2 <= x1 or y2 <= y1 or src_x2 <= src_x1 or src_y2 <= src_y1:
+                return
+                
+            # 提取源图像区域
+            src_region = img[src_y1:src_y2, src_x1:src_x2]
+            
+            # 如果源图像是RGBA格式
+            if src_region.shape[2] == 4:
+                # 提取alpha通道并应用全局alpha
+                src_alpha = src_region[:, :, 3] / 255.0 * alpha
+                src_alpha = np.expand_dims(src_alpha, axis=2)
+                
+                # 将源图像转换为RGB
+                src_rgb = src_region[:, :, :3]
+                
+                # 提取目标区域
+                dst_region = frame[y1:y2, x1:x2]
+                
+                # 混合图像
+                blended = dst_region * (1 - src_alpha) + src_rgb * src_alpha
+                frame[y1:y2, x1:x2] = blended.astype(np.uint8)
+            else:
+                # 如果是RGB格式，直接应用alpha混合
+                src_alpha = alpha
+                dst_region = frame[y1:y2, x1:x2]
+                blended = dst_region * (1 - src_alpha) + src_region * src_alpha
+                frame[y1:y2, x1:x2] = blended.astype(np.uint8)
+                
+        except Exception as e:
+            self.logger.error(f"图像混合失败: {str(e)}")
+            self.logger.error(f"frame shape: {frame.shape}, img shape: {img.shape}, position: ({x}, {y})")
+    
     def _render_formula(self, formula: str, font_size: int) -> np.ndarray:
         """
         渲染公式
@@ -695,9 +717,9 @@ class BlackboardVideoGenerator:
             渲染后的画布
         """
         try:
-            # 创建画布
+            # 创建透明画布
             img_size = 512
-            canvas = np.full((img_size, img_size, 3), 64, dtype=np.uint8)
+            canvas = np.zeros((img_size, img_size, 4), dtype=np.uint8)  # 使用RGBA格式
             
             if not isinstance(geometry_data, dict):
                 raise ValueError("几何数据必须是字典类型")
@@ -723,7 +745,7 @@ class BlackboardVideoGenerator:
                 
                 # 获取样式信息
                 style = shape_data.get('style', {})
-                stroke_color = (255, 255, 255)  # 默认白色
+                stroke_color = (255, 255, 255, 255)  # 白色，完全不透明
                 stroke_width = int(style.get('stroke-width', 2))
                 
                 # 收集所有点用于填充
@@ -755,17 +777,9 @@ class BlackboardVideoGenerator:
                     points_array = np.array(points, dtype=np.int32)
                     cv2.fillPoly(mask, [points_array], 255)
                     
-                    # 使用渐变填充效果
-                    fill_color = 80  # 基础灰色
-                    for c in range(3):
-                        # 创建渐变效果
-                        gradient = np.linspace(fill_color, fill_color * 0.7, img_size)
-                        gradient = np.tile(gradient, (img_size, 1))
-                        
-                        # 应用渐变填充
-                        canvas[:, :, c] = np.where(mask == 255,
-                                                canvas[:, :, c] * 0.6 + gradient * 0.4,
-                                                canvas[:, :, c])
+                    # 使用半透明填充
+                    fill_alpha = 64  # 填充的透明度
+                    canvas[mask == 255, 3] = np.maximum(canvas[mask == 255, 3], fill_alpha)
                     
                     # 重新绘制边界线，使用抗锯齿
                     for j in range(len(points)):
@@ -777,9 +791,9 @@ class BlackboardVideoGenerator:
             
         except Exception as e:
             self.logger.error(f"渲染几何图形时出错: {str(e)}")
-            error_img = np.ones((512, 512, 3), dtype=np.uint8) * np.array([30, 30, 30], dtype=np.uint8)
+            error_img = np.zeros((512, 512, 4), dtype=np.uint8)  # 创建透明错误图像
             cv2.putText(error_img, "Geometry Error", (10, 256), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255, 255), 2)
             return error_img
 
     def _render_partial_geometry(self, svg_path: Dict[str, Any], progress: float = 1.0, scale_factor: float = 1.0) -> np.ndarray:
