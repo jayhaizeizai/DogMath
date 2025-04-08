@@ -19,47 +19,25 @@
             "type": "text",
             "content": "欢迎使用中文数学教学视频生成器",
             "position": [0.5, 0.1],
-            "font_size": 48,
-            "animation": {
-              "enter": "fade_in",
-              "duration": 2
-            }
-          },
-          {
-            "type": "text",
-            "content": "以下是一些数学公式示例",
-            "position": [0.5, 0.2],
-            "font_size": 36,
-            "animation": {
-              "enter": "fade_in",
-              "duration": 1.5
-            }
+            "font_size": 48
           },
           {
             "type": "formula",
             "content": "$\\frac{x^2 + y^2}{2} = \\frac{1}{2}(x^2 + y^2)$",
-            "position": [0.5, 0.35],
-            "font_size": 42,
-            "animation": {
-              "enter": "slide_in_left",
-              "duration": 3
-            }
+            "position": [0.5, 0.3],
+            "font_size": 42
           },
           {
             "type": "formula",
             "content": "直角三角形的面积计算公式：$S = \\frac{1}{2}ab$",
-            "position": [0.5, 0.45],
-            "font_size": 38,
-            "animation": {
-              "enter": "slide_in_left",
-              "duration": 2.5
-            }
+            "position": [0.5, 0.5],
+            "font_size": 42
           },
           {
             "type": "geometry",
             "content": {
               "triangle": {
-                "path": "M0 0 L100 0 L100 100 L0 0 Z",
+                "path": "M 50 200 L 200 200 L 200 50 Z",
                 "style": {
                   "stroke": "white",
                   "stroke-width": 3,
@@ -67,7 +45,7 @@
                 }
               }
             },
-            "position": [0.5, 0.6],
+            "position": [0.5, 0.65],
             "scale": 0.8,
             "animation": {
               "enter": "draw_path",
@@ -77,12 +55,8 @@
           {
             "type": "text",
             "content": "这是一个直角三角形",
-            "position": [0.5, 0.75],
-            "font_size": 36,
-            "animation": {
-              "enter": "fade_in",
-              "duration": 1.5
-            }
+            "position": [0.5, 0.9],
+            "font_size": 36
           }
         ]
       }

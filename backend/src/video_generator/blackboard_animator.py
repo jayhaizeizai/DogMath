@@ -85,12 +85,12 @@ class BlackboardAnimator:
                  color: Tuple[int, int, int] = None,
                  animation: Optional[Dict] = None) -> np.ndarray:
         """
-        在图像上绘制文本
+        在图像上绘制文本（使用中心点定位）
         
         Args:
             image: 目标图像
             text: 要绘制的文本
-            position: 位置 (x, y)
+            position: 中心点位置 (x, y)
             font_size: 字体大小
             color: 文字颜色
             animation: 动画配置
@@ -111,8 +111,17 @@ class BlackboardAnimator:
         except:
             font = ImageFont.load_default()
             
+        # 计算文本尺寸
+        text_bbox = draw.textbbox((0, 0), text, font=font)
+        text_width = text_bbox[2] - text_bbox[0]
+        text_height = text_bbox[3] - text_bbox[1]
+        
+        # 计算左上角坐标（从中心点位置）
+        x = position[0] - text_width // 2
+        y = position[1] - text_height // 2
+        
         # 绘制文本
-        draw.text(position, text, font=font, fill=color)
+        draw.text((x, y), text, font=font, fill=color)
         
         # 转换回OpenCV格式
         result = np.array(image_pil)

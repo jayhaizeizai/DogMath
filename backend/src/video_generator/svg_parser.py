@@ -1,6 +1,7 @@
 from typing import List, Tuple
 import re
 from loguru import logger
+import traceback
 
 class SVGPathParser:
     """SVG路径解析器"""
@@ -19,20 +20,46 @@ class SVGPathParser:
         Returns:
             路径点列表
         """
-        # 这是一个简化版本，只处理M和L命令
-        if not path_data:
+        try:
+            # 更全面的路径解析，支持M,L,Z命令和空格分隔
+            points = []
+            # 使用正则表达式提取命令和坐标
+            pattern = r'([MLZ])\s*([^MLZ]*)'
+            
+            current_pos = (0, 0)
+            start_pos = (0, 0)
+            
+            for match in re.finditer(pattern, path_data):
+                cmd = match.group(1)
+                params = match.group(2).strip()
+                
+                # 处理空格或逗号分隔的坐标
+                coords = re.findall(r'[-+]?\d*\.?\d+', params)
+                
+                if cmd == 'M' and len(coords) >= 2:
+                    x = float(coords[0])
+                    y = float(coords[1])
+                    current_pos = (x, y)
+                    start_pos = (x, y)  # 记住起始位置
+                    points.append(current_pos)
+                    
+                elif cmd == 'L' and len(coords) >= 2:
+                    x = float(coords[0])
+                    y = float(coords[1])
+                    current_pos = (x, y)
+                    points.append(current_pos)
+                    
+                elif cmd == 'Z':
+                    # 闭合路径，回到起点
+                    points.append(start_pos)
+                    
+            self.logger.info(f"解析SVG路径: {path_data} -> 生成{len(points)}个点")
+            return points
+            
+        except Exception as e:
+            self.logger.error(f"SVG路径解析失败: {str(e)}")
+            self.logger.error(traceback.format_exc())
             return []
-            
-        points = []
-        # 匹配移动(M)和线(L)命令
-        pattern = r'([ML])(\d+),(\d+)'
-        for match in re.finditer(pattern, path_data):
-            cmd = match.group(1)
-            x = float(match.group(2))
-            y = float(match.group(3))
-            points.append((x, y))
-            
-        return points
         
     def normalize_path(self, points: List[Tuple[float, float]], target_size: Tuple[float, float]) -> List[Tuple[float, float]]:
         """
@@ -64,13 +91,12 @@ class SVGPathParser:
         if width == 0 or height == 0:
             return points
             
-        # 计算缩放因子
-        scale_x = target_size[0] / width
-        scale_y = target_size[1] / height
+        # 使用较小的缩放因子，保持图形合适大小
+        scale = min(target_size[0] / width, target_size[1] / height) * 0.5  # 添加0.5的缩放系数使图形更大
         
-        # 应用缩放
+        # 应用统一缩放以保持比例
         normalized_points = [
-            ((p[0] - min_x) * scale_x, (p[1] - min_y) * scale_y)
+            ((p[0] - min_x) * scale, (p[1] - min_y) * scale)
             for p in points
         ]
         

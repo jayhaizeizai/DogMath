@@ -91,29 +91,9 @@ class BlackboardVideoGenerator:
                 # 处理每个元素
                 for element in step['elements']:
                     element_type = element['type']
-                    position = element['position']
-                    
-                    # 计算元素的开始和结束帧
-                    start_frame = 0
-                    end_frame = total_frames
-                    
-                    # 处理动画
-                    animation = element.get('animation', {})
-                    fade_in_frames = 0
-                    fade_out_frames = 0
-                    
-                    if animation.get('enter') == 'fade_in':
-                        fade_duration = animation.get('duration', 1)
-                        fade_in_frames = int(fade_duration * fps)
-                    elif animation.get('enter') == 'slide_in_left':
-                        fade_duration = animation.get('duration', 1)
-                        fade_in_frames = int(fade_duration * fps)
-                    elif animation.get('enter') == 'draw_path':
-                        fade_duration = animation.get('duration', 1)
-                        fade_in_frames = int(fade_duration * fps)
-                    
-                    # 渲染元素
                     content = None
+                    
+                    # 根据元素类型渲染内容
                     if element_type == 'text':
                         content = self._render_text(element['content'], element.get('font_size', 32))
                     elif element_type == 'formula':
@@ -122,20 +102,28 @@ class BlackboardVideoGenerator:
                         content = self._render_geometry(element['content'], scale_factor=element.get('scale', 1.0))
                     
                     if content is not None:
-                        # 计算像素坐标
-                        img_h, img_w = content.shape[:2]
-                        x = int(position[0] * width) - img_w // 2
-                        y = int(position[1] * height) - img_h // 2
+                        # 处理动画配置
+                        animation = element.get('animation', {})
+                        fade_in_frames = 0
                         
+                        if animation:
+                            fade_duration = animation.get('duration', 1.0)
+                            fade_in_frames = int(fade_duration * fps)
+                        
+                        # 添加到时间线，包含所有必要的属性
                         timeline.append({
                             'type': element_type,
                             'content': content,
-                            'position': (x, y),
-                            'start_frame': start_frame,
-                            'end_frame': end_frame,
+                            'position': element['position'],
+                            'start_frame': 0,  # 从开始就显示
+                            'end_frame': total_frames,  # 持续到结束
                             'fade_in_frames': fade_in_frames,
-                            'fade_out_frames': fade_out_frames
+                            'fade_out_frames': 0,
+                            'z_index': self._get_z_index(element_type)
                         })
+                
+                # 按z_index排序时间线元素
+                timeline.sort(key=lambda x: x['z_index'])
                 
                 # 生成帧
                 for frame_idx in range(total_frames):
@@ -145,23 +133,16 @@ class BlackboardVideoGenerator:
                     # 渲染当前帧的所有元素
                     for item in timeline:
                         if item['start_frame'] <= frame_idx < item['end_frame']:
-                            # 获取内容
-                            content = item['content']
+                            # 计算alpha值（淡入效果）
+                            alpha = 1.0
+                            if item['fade_in_frames'] > 0 and frame_idx < item['fade_in_frames']:
+                                alpha = frame_idx / item['fade_in_frames']
+                            
+                            # 获取位置（0-1的比例值）
                             pos_x, pos_y = item['position']
                             
-                            # 计算Alpha值（淡入和淡出效果）
-                            alpha = 1.0
-                            if item['fade_in_frames'] > 0 and frame_idx < item['start_frame'] + item['fade_in_frames']:
-                                relative_frame = frame_idx - item['start_frame']
-                                alpha = relative_frame / item['fade_in_frames']
-                            elif item['fade_out_frames'] > 0 and frame_idx > item['end_frame'] - item['fade_out_frames']:
-                                relative_frame = item['end_frame'] - frame_idx
-                                alpha = relative_frame / item['fade_out_frames']
-                            
-                            self.logger.info(f"渲染帧 {frame_idx}, 元素类型: {item['type']}, 位置: ({pos_x}, {pos_y}), Alpha: {alpha}")
-                            
-                            # 合成元素到帧中
-                            self._blend_image_to_frame(frame, content, pos_x, pos_y, alpha)
+                            # 混合元素到帧中
+                            self._blend_image_to_frame(frame, item['content'], pos_x, pos_y, alpha)
                     
                     # 写入帧
                     video_writer.write(frame)
@@ -180,7 +161,6 @@ class BlackboardVideoGenerator:
             
         except Exception as e:
             self.logger.error(f"生成视频时出错: {str(e)}")
-            import traceback
             self.logger.error(traceback.format_exc())
             return None
     
@@ -199,15 +179,15 @@ class BlackboardVideoGenerator:
         
         return background
     
-    def _blend_image_to_frame(self, frame: np.ndarray, img: np.ndarray, x: int, y: int, alpha: float = 1.0):
+    def _blend_image_to_frame(self, frame: np.ndarray, img: np.ndarray, x: float, y: float, alpha: float = 1.0):
         """
         将图像混合到帧中
         
         Args:
             frame: 目标帧
             img: 要混合的图像
-            x: x坐标（中心点）
-            y: y坐标（中心点）
+            x: x坐标（0-1的比例值）
+            y: y坐标（0-1的比例值）
             alpha: 透明度
         """
         try:
@@ -218,50 +198,50 @@ class BlackboardVideoGenerator:
             img_h, img_w = img.shape[:2]
             frame_h, frame_w = frame.shape[:2]
             
-            # 计算图像的实际位置（中心对齐）
-            x = int(x - img_w / 2)
-            y = int(y - img_h / 2)
+            # 将0-1的比例转换为实际像素位置
+            pixel_x = int(x * frame_w)
+            pixel_y = int(y * frame_h)
+            
+            # 计算左上角坐标（考虑图像尺寸的一半）
+            x_start = pixel_x - img_w // 2
+            y_start = pixel_y - img_h // 2
             
             # 确保坐标在有效范围内
-            x = max(0, min(x, frame_w - img_w))
-            y = max(0, min(y, frame_h - img_h))
+            x_start = max(0, min(x_start, frame_w - img_w))
+            y_start = max(0, min(y_start, frame_h - img_h))
             
-            # 计算重叠区域
-            x1, y1 = max(0, x), max(0, y)
-            x2, y2 = min(frame_w, x + img_w), min(frame_h, y + img_h)
+            # 计算结束位置
+            x_end = x_start + img_w
+            y_end = y_start + img_h
             
-            # 计算源图像的对应区域
-            src_x1, src_y1 = max(0, -x), max(0, -y)
-            src_x2, src_y2 = src_x1 + (x2 - x1), src_y1 + (y2 - y1)
-            
-            # 检查是否有重叠区域
-            if x2 <= x1 or y2 <= y1 or src_x2 <= src_x1 or src_y2 <= src_y1:
-                return
+            # 确保不超出边界
+            if x_end > frame_w:
+                img = img[:, :-(x_end - frame_w)]
+                x_end = frame_w
+            if y_end > frame_h:
+                img = img[:-(y_end - frame_h), :]
+                y_end = frame_h
                 
-            # 提取源图像区域
-            src_region = img[src_y1:src_y2, src_x1:src_x2]
-            
-            # 如果源图像是RGBA格式
-            if src_region.shape[2] == 4:
+            # 如果是RGBA图像
+            if img.shape[2] == 4:
                 # 提取alpha通道并应用全局alpha
-                src_alpha = src_region[:, :, 3] / 255.0 * alpha
+                src_alpha = img[:, :, 3] / 255.0 * alpha
                 src_alpha = np.expand_dims(src_alpha, axis=2)
                 
                 # 将源图像转换为RGB
-                src_rgb = src_region[:, :, :3]
+                src_rgb = img[:, :, :3]
                 
                 # 提取目标区域
-                dst_region = frame[y1:y2, x1:x2]
+                dst_region = frame[y_start:y_end, x_start:x_end]
                 
                 # 混合图像
                 blended = dst_region * (1 - src_alpha) + src_rgb * src_alpha
-                frame[y1:y2, x1:x2] = blended.astype(np.uint8)
+                frame[y_start:y_end, x_start:x_end] = blended.astype(np.uint8)
             else:
-                # 如果是RGB格式，直接应用alpha混合
-                src_alpha = alpha
-                dst_region = frame[y1:y2, x1:x2]
-                blended = dst_region * (1 - src_alpha) + src_region * src_alpha
-                frame[y1:y2, x1:x2] = blended.astype(np.uint8)
+                # RGB图像的混合
+                dst_region = frame[y_start:y_end, x_start:x_end]
+                blended = cv2.addWeighted(dst_region, 1 - alpha, img, alpha, 0)
+                frame[y_start:y_end, x_start:x_end] = blended
                 
         except Exception as e:
             self.logger.error(f"图像混合失败: {str(e)}")
@@ -717,9 +697,9 @@ class BlackboardVideoGenerator:
             渲染后的画布
         """
         try:
-            # 创建透明画布
-            img_size = 512
-            canvas = np.zeros((img_size, img_size, 4), dtype=np.uint8)  # 使用RGBA格式
+            # 创建透明画布 - 使用合理的尺寸
+            img_size = 400  # 减小画布尺寸到合理范围
+            canvas = np.zeros((img_size, img_size, 4), dtype=np.uint8)
             
             if not isinstance(geometry_data, dict):
                 raise ValueError("几何数据必须是字典类型")
@@ -730,8 +710,12 @@ class BlackboardVideoGenerator:
                     continue
                 
                 # 解析SVG路径
-                commands = self._parse_svg_path(shape_data['path'])
+                path_str = shape_data['path']
+                self.logger.info(f"处理SVG路径: {path_str}")
+                
+                commands = self._parse_svg_path(path_str)
                 if not commands:
+                    self.logger.warning(f"没有从路径中解析出点: {path_str}")
                     continue
                 
                 # 计算边界框
@@ -739,62 +723,45 @@ class BlackboardVideoGenerator:
                 if not bbox:
                     continue
                 
-                # 计算变换参数
-                scale, offset_x, offset_y = self._calculate_transform(bbox, (img_size, img_size), scale_factor)
+                # 计算变换参数 - 适当的缩放比例
+                scale, offset_x, offset_y = self._calculate_transform(bbox, (img_size, img_size), scale_factor)  # 使用原始缩放因子
                 transformed_commands = self._transform_commands(commands, scale, offset_x, offset_y)
                 
                 # 获取样式信息
                 style = shape_data.get('style', {})
-                stroke_color = (255, 255, 255, 255)  # 白色，完全不透明
-                stroke_width = int(style.get('stroke-width', 2))
+                stroke_color = (255, 255, 255, 255)  # 白色
+                stroke_width = int(style.get('stroke-width', 3))
                 
-                # 收集所有点用于填充
+                # 收集用于绘制的点
                 points = []
-                last_pos = None
                 
                 # 渲染路径
-                for i, cmd in enumerate(transformed_commands):
+                last_pos = None
+                for cmd in transformed_commands:
                     if cmd['command'] == 'M':
                         last_pos = (int(cmd['x']), int(cmd['y']))
                         points.append(last_pos)
                     elif cmd['command'] == 'L' and last_pos is not None:
                         end_pos = (int(cmd['x']), int(cmd['y']))
-                        # 计算当前线段是否应该被渲染
-                        segment_progress = (i + 1) / len(transformed_commands)
-                        if segment_progress <= progress:
-                            cv2.line(canvas, last_pos, end_pos, stroke_color, stroke_width)
+                        cv2.line(canvas, last_pos, end_pos, stroke_color, stroke_width)
                         points.append(end_pos)
                         last_pos = end_pos
                     elif cmd['command'] == 'Z' and last_pos is not None and points:
                         # 闭合路径
-                        segment_progress = (i + 1) / len(transformed_commands)
-                        if segment_progress <= progress:
-                            cv2.line(canvas, last_pos, points[0], stroke_color, stroke_width)
+                        cv2.line(canvas, last_pos, points[0], stroke_color, stroke_width)
                 
-                # 如果有足够的点来形成一个闭合路径，添加填充效果
-                if len(points) >= 3:
-                    mask = np.zeros((img_size, img_size), dtype=np.uint8)
-                    points_array = np.array(points, dtype=np.int32)
-                    cv2.fillPoly(mask, [points_array], 255)
-                    
-                    # 使用半透明填充
-                    fill_alpha = 64  # 填充的透明度
-                    canvas[mask == 255, 3] = np.maximum(canvas[mask == 255, 3], fill_alpha)
-                    
-                    # 重新绘制边界线，使用抗锯齿
-                    for j in range(len(points)):
-                        p1 = points[j]
-                        p2 = points[(j + 1) % len(points)]
-                        cv2.line(canvas, p1, p2, stroke_color, stroke_width)
+                self.logger.info(f"几何图形渲染完成，点数: {len(points)}")
             
             return canvas
             
         except Exception as e:
             self.logger.error(f"渲染几何图形时出错: {str(e)}")
-            error_img = np.zeros((512, 512, 4), dtype=np.uint8)  # 创建透明错误图像
-            cv2.putText(error_img, "Geometry Error", (10, 256), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255, 255), 2)
-            return error_img
+            self.logger.error(traceback.format_exc())
+            # 返回错误图像
+            canvas = np.zeros((img_size, img_size, 4), dtype=np.uint8)
+            cv2.putText(canvas, "Geometry Error", (50, img_size//2), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255, 255), 2)
+            return canvas
 
     def _render_partial_geometry(self, svg_path: Dict[str, Any], progress: float = 1.0, scale_factor: float = 1.0) -> np.ndarray:
         """
@@ -1048,4 +1015,21 @@ class BlackboardVideoGenerator:
             self.logger.error(f"压缩视频时出错: {str(e)}")
             import traceback
             self.logger.error(traceback.format_exc())
+
+    def _get_z_index(self, element_type: str) -> int:
+        """
+        获取元素的z-index值
+        
+        Args:
+            element_type: 元素类型
+            
+        Returns:
+            z-index值
+        """
+        z_index_map = {
+            'text': 1,
+            'formula': 2,
+            'geometry': 3
+        }
+        return z_index_map.get(element_type, 0)
 
