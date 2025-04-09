@@ -360,8 +360,19 @@ class BlackboardVideoGenerator:
         """
         try:
             logger.info(f"渲染文本: {text}, 字体大小: {font_size}")
-            # 创建matplotlib图形
-            fig = plt.figure(figsize=(10, 2), dpi=200, facecolor='none')
+            
+            # 动态计算画布大小
+            text_length = len(text)
+            # 中文字符通常需要更多空间
+            has_chinese = any('\u4e00' <= c <= '\u9fff' for c in text)
+            width_factor = 0.4 if has_chinese else 0.25
+            # 根据文本长度和字体大小动态计算宽度
+            fig_width = min(max(text_length * width_factor, 2), 10)
+            # 根据字体大小调整高度
+            fig_height = min(max(font_size / 40, 1), 3)
+            
+            # 创建matplotlib图形，使用动态大小
+            fig = plt.figure(figsize=(fig_width, fig_height), dpi=200, facecolor='none')
             ax = fig.add_subplot(111)
             
             # 设置背景完全透明
@@ -371,8 +382,6 @@ class BlackboardVideoGenerator:
             
             # 尝试检测可用的中文字体
             chinese_font = None
-            has_chinese = any('\u4e00' <= c <= '\u9fff' for c in text)
-            
             if has_chinese:
                 try:
                     from matplotlib.font_manager import fontManager
@@ -478,8 +487,33 @@ class BlackboardVideoGenerator:
         """
         try:
             logger.info(f"渲染LaTeX公式: {latex}, 字体大小: {font_size}")
-            # 创建matplotlib图形
-            fig = plt.figure(figsize=(10, 2), dpi=200, facecolor='none')
+            
+            # 动态计算画布大小
+            content = latex.strip('$')
+            
+            # 检测特殊结构需要更宽的画布
+            has_fraction = '\\frac' in content
+            has_matrix = 'matrix' in content
+            has_align = 'align' in content
+            
+            # 基本宽度系数
+            width_factor = 0.25
+            # 根据特殊结构增加宽度
+            if has_fraction: width_factor += 0.1
+            if has_matrix: width_factor += 0.3
+            if has_align: width_factor += 0.2
+            
+            # 计算宽度，长公式给更宽的空间
+            content_length = len(content)
+            fig_width = min(max(content_length * width_factor, 2), 12)
+            
+            # 公式通常需要更多垂直空间，特别是分数和矩阵
+            fig_height = min(max(font_size / 30, 1.5), 4)
+            if has_fraction or has_matrix:
+                fig_height = min(fig_height * 1.5, 5)
+            
+            # 创建matplotlib图形，使用动态大小
+            fig = plt.figure(figsize=(fig_width, fig_height), dpi=200, facecolor='none')
             ax = fig.add_subplot(111)
             
             # 设置背景完全透明
