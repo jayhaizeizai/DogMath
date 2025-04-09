@@ -301,10 +301,13 @@ class BlackboardVideoGenerator:
                 # 放置各个部分
                 x_offset = 0
                 for img in rendered_parts:
+                    # 如果使用了裁剪功能，保留它
+                    # img = self._trim_image(img)  # 保留此行如果已实现裁剪功能
+                    
                     h, w = img.shape[:2]
                     y_offset = (max_height - h) // 2
                     combined_img[y_offset:y_offset+h, x_offset:x_offset+w] = img
-                    x_offset += w + 5
+                    x_offset += w + 5  # 恢复为5像素的间隔
                     logger.debug(f"放置图像部分，当前x_offset: {x_offset}")
                 
                 # 检查是否需要缩放最终图像
@@ -324,6 +327,8 @@ class BlackboardVideoGenerator:
                     if self.debug:
                         self.logger.info(f"组合公式缩放后图像大小: {new_w}x{new_h}")
                 
+                # 裁剪图像
+                combined_img = self._trim_image(combined_img)
                 return combined_img
             
             # 对于纯中文公式(不含LaTeX格式)
@@ -440,7 +445,7 @@ class BlackboardVideoGenerator:
             buf = io.BytesIO()
             plt.savefig(buf, format='png', 
                        bbox_inches='tight',
-                       pad_inches=0.2,
+                       pad_inches=0.05,
                        facecolor='none',
                        edgecolor='none',
                        transparent=True)
@@ -462,6 +467,8 @@ class BlackboardVideoGenerator:
                 for c in range(3):  # RGB通道
                     canvas[:, :, c] = canvas[:, :, c] * (1 - alpha) + 255 * alpha
                 
+                # 裁剪图像
+                canvas = self._trim_image(canvas)
                 return canvas
             else:
                 return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -546,7 +553,7 @@ class BlackboardVideoGenerator:
             buf = io.BytesIO()
             plt.savefig(buf, format='png', 
                         bbox_inches='tight',
-                        pad_inches=0.2,
+                        pad_inches=0.05,
                         facecolor='none',
                         edgecolor='none',
                         transparent=True)
@@ -567,6 +574,9 @@ class BlackboardVideoGenerator:
                 # 只将非透明部分渲染为白色
                 for c in range(3):  # RGB通道
                     canvas[:, :, c] = canvas[:, :, c] * (1 - alpha) + 255 * alpha
+                
+                # 裁剪图像
+                canvas = self._trim_image(canvas)
                 
                 # 检查是否需要缩放图像
                 if not skip_scaling:  # 添加此条件
@@ -678,7 +688,7 @@ class BlackboardVideoGenerator:
             buf = io.BytesIO()
             plt.savefig(buf, format='png', 
                        bbox_inches='tight',
-                       pad_inches=0.2,
+                       pad_inches=0.05,
                        facecolor='none',
                        edgecolor='none',
                        transparent=True)
@@ -699,6 +709,9 @@ class BlackboardVideoGenerator:
                 # 只将非透明部分（文本）渲染为白色
                 for c in range(3):  # RGB通道
                     canvas[:, :, c] = canvas[:, :, c] * (1 - alpha) + 255 * alpha
+                
+                # 裁剪图像
+                canvas = self._trim_image(canvas)
                 
                 # 检查是否需要缩放图像
                 max_width = 800  # 最大宽度
@@ -1076,4 +1089,39 @@ class BlackboardVideoGenerator:
             'geometry': 3
         }
         return z_index_map.get(element_type, 0)
+
+    def _trim_image(self, img):
+        """
+        裁剪图像，只保留非背景部分
+        
+        Args:
+            img: 输入图像 (RGB或RGBA)
+            
+        Returns:
+            裁剪后的图像
+        """
+        # 如果是RGBA图像，使用alpha通道
+        if img.shape[2] == 4:
+            # 寻找非透明区域
+            mask = img[:,:,3] > 0
+        else:
+            # RGB图像，假设背景是暗色的(30,30,30)
+            mask = np.any(img > 60, axis=2)
+        
+        # 寻找非零区域的边界
+        coords = np.argwhere(mask)
+        if len(coords) == 0:
+            return img
+        
+        y_min, x_min = coords.min(axis=0)
+        y_max, x_max = coords.max(axis=0)
+        
+        # 添加小边距(2像素)
+        y_min = max(0, y_min - 2)
+        x_min = max(0, x_min - 2)
+        y_max = min(img.shape[0] - 1, y_max + 2)
+        x_max = min(img.shape[1] - 1, x_max + 2)
+        
+        # 裁剪图像
+        return img[y_min:y_max+1, x_min:x_max+1]
 
