@@ -259,16 +259,20 @@ class BlackboardVideoGenerator:
             公式图像
         """
         try:
+            logger.info(f"渲染公式: {formula}, 字体大小: {font_size}")
             # 检测是否含有中文
             has_chinese = any('\u4e00' <= c <= '\u9fff' for c in formula)
+            logger.debug(f"公式是否包含中文: {has_chinese}")
             
             # 检测是否含有LaTeX格式的公式
             is_latex = '\\' in formula or '$' in formula
+            logger.debug(f"公式是否为LaTeX格式: {is_latex}")
             
             # 混合内容处理（中文+LaTeX）
             if has_chinese and is_latex:
                 # 分割文本和LaTeX公式
                 components = re.split(r'(\$[^$]*\$)', formula)
+                logger.debug(f"分割后的组件: {components}")
                 
                 # 处理多个LaTeX部分
                 rendered_parts = []
@@ -277,16 +281,19 @@ class BlackboardVideoGenerator:
                     if comp.strip():  # 忽略空字符串
                         if comp.startswith('$') and comp.endswith('$'):
                             # 渲染LaTeX部分
-                            latex_img = self._render_latex_as_image(comp, font_size)
+                            latex_img = self._render_latex_as_image(comp, font_size, skip_scaling=True)
                             rendered_parts.append(latex_img)
+                            logger.debug(f"渲染LaTeX部分: {comp}, 大小: {latex_img.shape}")
                         else:
                             # 渲染中文部分
                             chinese_img = self._render_text_as_image(comp, font_size)
                             rendered_parts.append(chinese_img)
+                            logger.debug(f"渲染中文部分: {comp}, 大小: {chinese_img.shape}")
                 
                 # 计算总宽度和最大高度
-                total_width = sum(img.shape[1] for img in rendered_parts) + 20 * (len(rendered_parts) - 1)
+                total_width = sum(img.shape[1] for img in rendered_parts) + 5 * (len(rendered_parts) - 1)
                 max_height = max(img.shape[0] for img in rendered_parts)
+                logger.debug(f"组合图像总宽度: {total_width}, 最大高度: {max_height}")
                 
                 # 创建组合图像
                 combined_img = np.ones((max_height, total_width, 3), dtype=np.uint8) * np.array([30, 30, 30], dtype=np.uint8)
@@ -297,11 +304,12 @@ class BlackboardVideoGenerator:
                     h, w = img.shape[:2]
                     y_offset = (max_height - h) // 2
                     combined_img[y_offset:y_offset+h, x_offset:x_offset+w] = img
-                    x_offset += w + 20
+                    x_offset += w + 5
+                    logger.debug(f"放置图像部分，当前x_offset: {x_offset}")
                 
                 # 检查是否需要缩放最终图像
-                max_width = 800  # 最大宽度
-                max_img_height = 600  # 最大高度
+                max_width = 800
+                max_img_height = 600
                 
                 h, w = combined_img.shape[:2]
                 if self.debug:
@@ -333,7 +341,7 @@ class BlackboardVideoGenerator:
             return self._render_text_as_image(formula, font_size)
             
         except Exception as e:
-            self.logger.error(f"渲染公式时出错: {str(e)}")
+            logger.error(f"渲染公式时出错: {str(e)}")
             # 创建一个默认图像
             img = np.zeros((100, 300, 3), dtype=np.uint8)
             cv2.putText(img, "Formula Error", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
@@ -351,6 +359,7 @@ class BlackboardVideoGenerator:
             文本图像
         """
         try:
+            logger.info(f"渲染文本: {text}, 字体大小: {font_size}")
             # 创建matplotlib图形
             fig = plt.figure(figsize=(10, 2), dpi=200, facecolor='none')
             ax = fig.add_subplot(111)
@@ -449,24 +458,26 @@ class BlackboardVideoGenerator:
                 return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 
         except Exception as e:
-            self.logger.error(f"渲染文本为图像时出错: {str(e)}")
+            logger.error(f"渲染文本为图像时出错: {str(e)}")
             # 创建一个默认图像
             img = np.zeros((100, max(len(text) * 20, 200), 3), dtype=np.uint8)
             cv2.putText(img, "Text Error", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
             return img
             
-    def _render_latex_as_image(self, latex: str, font_size: int = 24) -> np.ndarray:
+    def _render_latex_as_image(self, latex: str, font_size: int = 24, skip_scaling: bool = False) -> np.ndarray:
         """
         将LaTeX公式渲染为图像
         
         Args:
             latex: LaTeX公式字符串
             font_size: 字体大小
+            skip_scaling: 是否跳过缩放
             
         Returns:
             渲染后的图像
         """
         try:
+            logger.info(f"渲染LaTeX公式: {latex}, 字体大小: {font_size}")
             # 创建matplotlib图形
             fig = plt.figure(figsize=(10, 2), dpi=200, facecolor='none')
             ax = fig.add_subplot(111)
@@ -524,31 +535,30 @@ class BlackboardVideoGenerator:
                     canvas[:, :, c] = canvas[:, :, c] * (1 - alpha) + 255 * alpha
                 
                 # 检查是否需要缩放图像
-                max_width = 800  # 最大宽度
-                max_height = 600  # 最大高度
-                
-                h, w = canvas.shape[:2]
-                if self.debug:
-                    self.logger.info(f"LaTeX公式原始图像大小: {w}x{h}")
-                
-                # 如果图像太大，进行等比例缩放
-                if w > max_width or h > max_height:
-                    scale = min(max_width / w, max_height / h)
-                    new_w = int(w * scale)
-                    new_h = int(h * scale)
-                    canvas = cv2.resize(canvas, (new_w, new_h), interpolation=cv2.INTER_AREA)
-                    if self.debug:
-                        self.logger.info(f"LaTeX公式缩放后图像大小: {new_w}x{new_h}")
+                if not skip_scaling:  # 添加此条件
+                    max_width = 800  # 最大宽度
+                    max_height = 600  # 最大高度
+                    
+                    h, w = canvas.shape[:2]
+                    logger.debug(f"LaTeX公式原始图像大小: {w}x{h}")
+                    
+                    # 如果图像太大，进行等比例缩放
+                    if w > max_width or h > max_height:
+                        scale = min(max_width / w, max_height / h)
+                        new_w = int(w * scale)
+                        new_h = int(h * scale)
+                        canvas = cv2.resize(canvas, (new_w, new_h), interpolation=cv2.INTER_AREA)
+                        logger.debug(f"LaTeX公式缩放后图像大小: {new_w}x{new_h}")
                 
                 return canvas
             else:
                 return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 
         except Exception as e:
-            self.logger.error(f"渲染LaTeX公式时出错: {latex}")
-            self.logger.error(str(e))
+            logger.error(f"渲染LaTeX公式时出错: {latex}")
+            logger.error(str(e))
             import traceback
-            self.logger.error(traceback.format_exc())
+            logger.error(traceback.format_exc())
             # 创建一个默认图像，使用与黑板背景匹配的颜色
             img = np.ones((100, 300, 3), dtype=np.uint8) * np.array([30, 30, 30], dtype=np.uint8)
             cv2.putText(img, "LaTeX Error", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
@@ -678,7 +688,7 @@ class BlackboardVideoGenerator:
                 return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 
         except Exception as e:
-            self.logger.error(f"渲染文本时出错: {str(e)}")
+            logger.error(f"渲染文本时出错: {str(e)}")
             # 创建一个默认图像 - 使用OpenCV渲染文本（无中文支持）
             img = np.zeros((100, max(len(text) * 20, 200), 3), dtype=np.uint8)
             cv2.putText(img, "Text Error", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
