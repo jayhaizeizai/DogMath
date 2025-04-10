@@ -45,7 +45,7 @@ MathVideoScript 由以下四个主要部分组成：
 - x坐标：0表示最左边，1表示最右边
 - y坐标：0表示最上边，1表示最下边
 - 坐标原点(0,0)位于左上角
-- 所有position属性都使用这个相对坐标系统
+- 所有position属性都使用这个相对坐标系统，格式为 `[x, y]`
 
 例如：
 - `"position": [0.5, 0.5]` 表示元素位于画面正中心
@@ -57,6 +57,30 @@ MathVideoScript 由以下四个主要部分组成：
 - 与分辨率无关，确保内容在不同分辨率下保持一致的相对位置
 - 便于进行位置的比例计算
 - 简化布局设计
+
+### 2.2 结构灵活性
+
+脚本可以根据需要包含以下部分的一个或多个：
+- 必须包含：元数据(metadata)和黑板内容(blackboard)
+- 可选包含：音频内容(audio)和知识点标注(annotations)
+
+简化版的结构示例：
+```json
+{
+  "metadata": {
+    "problem_id": "string",
+    "difficulty": "string",
+    "estimated_duration": number,
+    "knowledge_tags": ["string"],
+    "created_at": "timestamp"
+  },
+  "blackboard": {
+    "background": "string",
+    "resolution": [width, height],
+    "steps": []
+  }
+}
+```
 
 ## 3. 元素类型详解
 
@@ -278,7 +302,7 @@ MathVideoScript 由以下四个主要部分组成：
           }
         }
       },
-      "position": [50, 40],
+      "position": [0.5, 0.4],
       "animation": {
         "enter": "draw_path",
         "duration": 3
@@ -287,7 +311,7 @@ MathVideoScript 由以下四个主要部分组成：
     {
       "type": "text",
       "content": "O",
-      "position": [50, 50],
+      "position": [0.5, 0.5],
       "font_size": 24,
       "animation": {
         "enter": "fade_in",
@@ -297,7 +321,7 @@ MathVideoScript 由以下四个主要部分组成：
     {
       "type": "formula",
       "content": "OA = 5",
-      "position": [15, 20],
+      "position": [0.15, 0.2],
       "font_size": 28,
       "animation": {
         "enter": "slide_in_left",
@@ -312,9 +336,26 @@ MathVideoScript 由以下四个主要部分组成：
 
 1. 所有文本内容必须使用UTF-8编码
 2. LaTeX公式中的反斜杠需要转义
-3. 坐标位置使用0-100的百分比值
+3. 坐标位置使用0-1范围的浮点数值
 4. 时间戳使用秒为单位的数值
 5. 动画时长不宜过长，避免影响观看体验
 6. 确保所有资源文件的路径正确
 7. 注意内容的逻辑顺序和衔接 
 
+## 9. 中文内容支持
+
+规范完全支持中文内容：
+1. 所有文本元素均可使用中文字符
+2. 公式与中文可以混合使用
+3. 动画效果对中文内容同样适用
+4. 建议中文显示时使用合适的字体大小与行间距
+
+```json
+{
+  "type": "formula",
+  "content": "直角三角形的面积计算公式：$S = \\frac{1}{2}ab$",
+  "position": [0.5, 0.5],
+  "font_size": 42
+}
+```
+```
