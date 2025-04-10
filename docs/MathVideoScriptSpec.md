@@ -129,7 +129,7 @@ MathVideoScript 由以下四个主要部分组成：
   "type": "geometry",
   "content": {
     "circle": {
-      "path": "M 50 50 m -40, 0 a 40,40 0 1,0 80,0 a 40,40 0 1,0 -80,0",
+      "path": "M 50 50 m -40 0 a 40 40 0 1 0 80 0 a 40 40 0 1 0 -80 0",
       "style": {
         "stroke": "white",
         "stroke-width": 2,
@@ -141,7 +141,7 @@ MathVideoScript 由以下四个主要部分组成：
       "style": {
         "stroke": "white",
         "stroke-width": 2,
-        "stroke-dasharray": "5,5"
+        "stroke-dasharray": "5 5"
       }
     }
   },
@@ -154,6 +154,30 @@ MathVideoScript 由以下四个主要部分组成：
   }
 }
 ```
+
+**重要说明：**
+1. SVG路径使用空格（而非逗号）分隔坐标值和参数
+   - 正确: `"M 50 50 m -40 0 a 40 40 0 1 0 80 0"`
+   - 错误: `"M 50 50 m -40, 0 a 40,40 0 1,0 80,0"`
+   
+2. 特殊样式属性如`stroke-dasharray`也需使用空格分隔值
+   - 正确: `"stroke-dasharray": "5 5"`
+   - 错误: `"stroke-dasharray": "5,5"`
+
+3. SVG路径命令参考:
+   - `M x y` - 移动到坐标(x,y)
+   - `L x y` - 画线到坐标(x,y)
+   - `A rx ry x-axis-rotation large-arc-flag sweep-flag x y` - 绘制椭圆弧
+   - `Z` - 闭合路径
+
+4. **命令支持限制:** 当前系统主要支持以下SVG命令:
+   - 完全支持: `M`(移动), `L`(直线), `Z`(闭合)
+   - 有限支持: `A/a`(弧形) - 会简化为直线段，可能丢失曲率
+
+5. **绘制圆形的最佳实践:**
+   - 圆形可以使用多个线段近似表示: `M 50 20 L 80 50 L 50 80 L 20 50 Z`
+   - 对于更精确的圆形，可以使用更多的直线段
+   - 当使用弧形命令(`a`)绘制圆时，确保参数之间使用空格而非逗号分隔
 
 ### 3.4 函数图像类型 (graph)
 
@@ -357,5 +381,4 @@ MathVideoScript 由以下四个主要部分组成：
   "position": [0.5, 0.5],
   "font_size": 42
 }
-```
 ```

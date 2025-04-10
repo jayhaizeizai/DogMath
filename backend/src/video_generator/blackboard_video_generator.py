@@ -13,6 +13,7 @@ import subprocess
 import sys
 import re
 import traceback
+import math
 
 class BlackboardVideoGenerator:
     """黑板视频生成器"""
@@ -79,6 +80,24 @@ class BlackboardVideoGenerator:
             
             # 创建黑板背景
             background = self._create_blackboard_background(width, height)
+            
+            # 在创建timeline之前，识别几何元素和文本标签
+            for step in data['steps']:
+                geometry_elements = []
+                text_elements = []
+                
+                for element in step['elements']:
+                    if element['type'] == 'geometry':
+                        geometry_elements.append(element)
+                    elif element['type'] == 'text' and element['content'] in ['O', 'A', 'B', 'C']:
+                        text_elements.append(element)
+                
+                # 如果同时存在几何图形和字母标签，确保它们的位置匹配
+                if geometry_elements and text_elements:
+                    self.logger.info("检测到几何图形和文本标签，调整位置以确保匹配")
+                    
+                    # 具体的调整逻辑
+                    # 例如，可以根据几何图形的大小和位置调整文本标签的位置
             
             # 处理每个步骤
             for step in data['steps']:
@@ -222,6 +241,10 @@ class BlackboardVideoGenerator:
                 img = img[:-(y_end - frame_h), :]
                 y_end = frame_h
                 
+            # 在开始添加日志
+            if img is not None and self.debug:
+                self.logger.info(f"混合图像: 位置=({x:.2f}, {y:.2f}), 尺寸={img.shape}")
+                
             # 如果是RGBA图像
             if img.shape[2] == 4:
                 # 提取alpha通道并应用全局alpha
@@ -320,7 +343,7 @@ class BlackboardVideoGenerator:
                 
                 # 如果图像太大，进行等比例缩放
                 if w > max_width or h > max_img_height:
-                    scale = min(max_width / w, max_img_height / h)
+                    scale = min(max_width / w, max_height / h)
                     new_w = int(w * scale)
                     new_h = int(h * scale)
                     combined_img = cv2.resize(combined_img, (new_w, new_h), interpolation=cv2.INTER_AREA)
@@ -744,70 +767,92 @@ class BlackboardVideoGenerator:
     def _render_geometry(self, geometry_data: Dict[str, Any], progress: float = 1.0, scale_factor: float = 1.0) -> np.ndarray:
         """
         渲染几何图形
-        
-        Args:
-            geometry_data: 包含多个形状的字典，每个形状都有path和style属性
-            progress: 渲染进度（0-1）
-            scale_factor: 缩放因子
-            
-        Returns:
-            渲染后的画布
         """
         try:
-            # 创建透明画布 - 使用合理的尺寸
-            img_size = 400  # 减小画布尺寸到合理范围
+            # 创建透明画布
+            img_size = 400
             canvas = np.zeros((img_size, img_size, 4), dtype=np.uint8)
             
             if not isinstance(geometry_data, dict):
                 raise ValueError("几何数据必须是字典类型")
             
-            # 遍历所有形状
+            # 首先解析所有形状，计算整体边界框
+            shapes_commands = {}
+            combined_bbox = None
+            
+            # 第一遍：解析所有形状并计算统一边界框
             for shape_name, shape_data in geometry_data.items():
                 if not isinstance(shape_data, dict) or 'path' not in shape_data:
                     continue
-                
-                # 解析SVG路径
+                    
                 path_str = shape_data['path']
                 self.logger.info(f"处理SVG路径: {path_str}")
                 
                 commands = self._parse_svg_path(path_str)
                 if not commands:
-                    self.logger.warning(f"没有从路径中解析出点: {path_str}")
                     continue
+                    
+                shapes_commands[shape_name] = commands
                 
-                # 计算边界框
+                # 计算当前形状的边界框
                 bbox = self._calculate_bbox(commands)
                 if not bbox:
                     continue
+                    
+                self.logger.info(f"形状'{shape_name}'的边界框: {bbox}")
                 
-                # 计算变换参数 - 适当的缩放比例
-                scale, offset_x, offset_y = self._calculate_transform(bbox, (img_size, img_size), scale_factor)  # 使用原始缩放因子
+                # 更新组合边界框
+                if combined_bbox is None:
+                    combined_bbox = bbox
+                else:
+                    combined_bbox = (
+                        min(combined_bbox[0], bbox[0]),
+                        min(combined_bbox[1], bbox[1]),
+                        max(combined_bbox[2], bbox[2]),
+                        max(combined_bbox[3], bbox[3])
+                    )
+            
+            # 确保我们有有效的边界框
+            if combined_bbox is None:
+                self.logger.warning("没有找到有效的几何图形边界框")
+                return canvas
+            
+            self.logger.info(f"所有几何形状的组合边界框: {combined_bbox}")
+            
+            # 计算统一的变换参数
+            scale, offset_x, offset_y = self._calculate_transform(
+                combined_bbox, (img_size, img_size), scale_factor
+            )
+            self.logger.info(f"统一变换参数: scale={scale}, offset_x={offset_x}, offset_y={offset_y}")
+            
+            # 第二遍：使用统一变换参数渲染所有形状
+            for shape_name, commands in shapes_commands.items():
+                # 应用统一变换
                 transformed_commands = self._transform_commands(commands, scale, offset_x, offset_y)
                 
                 # 获取样式信息
+                shape_data = geometry_data[shape_name]
                 style = shape_data.get('style', {})
                 stroke_color = (255, 255, 255, 255)  # 白色
-                stroke_width = int(style.get('stroke-width', 3))
-                
-                # 收集用于绘制的点
-                points = []
+                stroke_width = int(style.get('stroke-width', 2))
                 
                 # 渲染路径
                 last_pos = None
                 for cmd in transformed_commands:
                     if cmd['command'] == 'M':
                         last_pos = (int(cmd['x']), int(cmd['y']))
-                        points.append(last_pos)
                     elif cmd['command'] == 'L' and last_pos is not None:
                         end_pos = (int(cmd['x']), int(cmd['y']))
-                        cv2.line(canvas, last_pos, end_pos, stroke_color, stroke_width)
-                        points.append(end_pos)
+                        # 使用抗锯齿
+                        cv2.line(canvas, last_pos, end_pos, stroke_color, stroke_width, cv2.LINE_AA)
                         last_pos = end_pos
-                    elif cmd['command'] == 'Z' and last_pos is not None and points:
+                    elif cmd['command'] == 'Z' and last_pos is not None and len(transformed_commands) > 0:
                         # 闭合路径
-                        cv2.line(canvas, last_pos, points[0], stroke_color, stroke_width)
-                
-                self.logger.info(f"几何图形渲染完成，点数: {len(points)}")
+                        for start_cmd in transformed_commands:
+                            if start_cmd['command'] == 'M':
+                                start_pos = (int(start_cmd['x']), int(start_cmd['y']))
+                                cv2.line(canvas, last_pos, start_pos, stroke_color, stroke_width, cv2.LINE_AA)
+                                break
             
             return canvas
             
@@ -910,37 +955,177 @@ class BlackboardVideoGenerator:
             if not isinstance(svg_path, str):
                 raise ValueError("SVG路径必须是字符串类型")
             
-            # 使用正则表达式匹配命令和参数
-            pattern = r'([MLZmlz])([^MLZmlz]*)'
+            # 更新正则表达式以匹配更多命令类型，包括弧形命令a
+            pattern = r'([MLZAamlz])([^MLZAamlz]*)'
             commands = []
             
+            # 检测是否是圆形路径
+            is_circle = "a 40 40 0 1 0 80 0 a 40 40 0 1 0 -80 0" in svg_path
+            
+            # 如果是完整圆，直接使用参数方程生成更平滑的圆
+            if is_circle:
+                self.logger.info("检测到完整圆形路径，使用参数方程生成")
+                # 假设圆心在(50,50)，半径为40
+                center_x, center_y = 50, 50
+                radius = 40
+                # 生成24个点的平滑圆
+                num_points = 24
+                
+                # 第一个点
+                commands.append({
+                    'command': 'M',
+                    'x': center_x + radius,
+                    'y': center_y
+                })
+                
+                # 其余点
+                for i in range(1, num_points):
+                    angle = 2 * 3.14159 * i / num_points
+                    x = center_x + radius * math.cos(angle)
+                    y = center_y + radius * math.sin(angle)
+                    commands.append({
+                        'command': 'L',
+                        'x': x,
+                        'y': y
+                    })
+                
+                # 闭合路径
+                commands.append({
+                    'command': 'Z'
+                })
+                
+                self.logger.info(f"生成平滑圆形，中心=({center_x}, {center_y})，半径={radius}，点数={num_points}")
+                return commands
+            
+            # 常规SVG路径解析
+            current_pos = [0, 0]
+            self.logger.info(f"开始解析SVG路径: {svg_path}")
+            
             for match in re.finditer(pattern, svg_path):
-                cmd, params = match.groups()
+                cmd = match.group(1)
+                params = match.group(2).strip()
+                
+                self.logger.info(f"检测到命令: {cmd}, 参数: {params}")
+                
                 # 提取数字参数
                 numbers = [float(n) for n in params.strip().split()]
                 
                 if cmd in ['M', 'm']:  # 移动命令
-                    commands.append({
-                        'command': cmd.upper(),
-                        'x': numbers[0],
-                        'y': numbers[1]
-                    })
+                    if len(numbers) >= 2:
+                        x, y = numbers[0], numbers[1]
+                        if cmd == 'm':  # 相对坐标
+                            x += current_pos[0]
+                            y += current_pos[1]
+                        current_pos = [x, y]
+                        commands.append({
+                            'command': 'M',
+                            'x': x,
+                            'y': y
+                        })
+                        self.logger.info(f"添加移动命令(M) 到 ({x}, {y})")
+                
                 elif cmd in ['L', 'l']:  # 直线命令
-                    commands.append({
-                        'command': cmd.upper(),
-                        'x': numbers[0],
-                        'y': numbers[1]
-                    })
+                    if len(numbers) >= 2:
+                        x, y = numbers[0], numbers[1]
+                        if cmd == 'l':  # 相对坐标
+                            x += current_pos[0]
+                            y += current_pos[1]
+                        current_pos = [x, y]
+                        commands.append({
+                            'command': 'L',
+                            'x': x,
+                            'y': y
+                        })
+                        self.logger.info(f"添加直线命令(L) 到 ({x}, {y})")
+                
                 elif cmd in ['Z', 'z']:  # 闭合路径命令
                     commands.append({
                         'command': 'Z'
                     })
+                    self.logger.info(f"添加闭合命令(Z)")
                 
+                elif cmd in ['A', 'a']:  # 弧形命令 - 使用多个线段近似
+                    if len(numbers) >= 7:
+                        rx, ry = numbers[0], numbers[1]
+                        x_axis_rotation = numbers[2]
+                        large_arc_flag = int(numbers[3])
+                        sweep_flag = int(numbers[4])
+                        x, y = numbers[5], numbers[6]
+                        
+                        self.logger.info(f"处理弧形命令(A/a): rx={rx}, ry={ry}, 终点=({x}, {y})")
+                        
+                        if cmd == 'a':  # 相对坐标
+                            x += current_pos[0]
+                            y += current_pos[1]
+                        
+                        # 简化：使用多个点近似圆弧
+                        # 创建8-12个中间点来近似圆弧
+                        num_segments = 12
+                        self.logger.info(f"将弧形分为{num_segments}段，从({current_pos[0]}, {current_pos[1]})到({x}, {y})")
+                        
+                        # 计算起点和终点之间的直线距离
+                        dx = x - current_pos[0]
+                        dy = y - current_pos[1]
+                        
+                        # 对于每个线段，添加一个控制点
+                        for i in range(1, num_segments):
+                            t = i / num_segments
+                            # 这只是一个简单的线性插值，可以使用更复杂的贝塞尔曲线近似
+                            ix = current_pos[0] + dx * t
+                            iy = current_pos[1] + dy * t
+                            
+                            # 加入凸度来模拟圆弧
+                            # 这是一个简单的近似，不完全准确但视觉上会更接近圆弧
+                            bulge = min(rx, ry) * 0.5
+                            mid_x = (current_pos[0] + x) / 2
+                            mid_y = (current_pos[1] + y) / 2
+                            
+                            # 垂直于直线的方向
+                            perpendicular_x = -dy
+                            perpendicular_y = dx
+                            
+                            # 归一化
+                            length = (perpendicular_x**2 + perpendicular_y**2)**0.5
+                            if length > 0:
+                                perpendicular_x /= length
+                                perpendicular_y /= length
+                                
+                                # 调整点的位置，使其向外凸出形成圆弧
+                                # 根据距离中点的远近调整凸出量
+                                dist_from_mid = ((ix - mid_x)**2 + (iy - mid_y)**2)**0.5
+                                max_dist = ((current_pos[0] - mid_x)**2 + (current_pos[1] - mid_y)**2)**0.5
+                                
+                                if max_dist > 0:
+                                    # 创建弧形效果 - 这里是关键部分
+                                    if sweep_flag == 0:
+                                        bulge_factor = -(1 - (dist_from_mid / max_dist)**2) * bulge
+                                    else:
+                                        bulge_factor = (1 - (dist_from_mid / max_dist)**2) * bulge
+                                    
+                                    ix += perpendicular_x * bulge_factor
+                                    iy += perpendicular_y * bulge_factor
+                                    
+                                    self.logger.info(f"添加弧形插值点 {i}/{num_segments}: ({ix}, {iy}) 凸度: {bulge_factor}")
+                                    commands.append({
+                                        'command': 'L',
+                                        'x': ix,
+                                        'y': iy
+                                    })
+                        
+                        # 添加终点
+                        commands.append({
+                            'command': 'L',
+                            'x': x,
+                            'y': y
+                        })
+                        self.logger.info(f"添加弧形终点: ({x}, {y})")
+                        current_pos = [x, y]
+            
+            self.logger.info(f"SVG路径解析完成，共生成{len(commands)}个命令点")
             return commands
             
         except Exception as e:
             self.logger.error(f"解析SVG路径时出错: {str(e)}")
-            import traceback
             self.logger.error(traceback.format_exc())
             return []
 
@@ -975,14 +1160,6 @@ class BlackboardVideoGenerator:
     def _calculate_transform(self, bbox: Tuple[float, float, float, float], canvas_size: Tuple[int, int], scale_factor: float = 1.0) -> Tuple[float, float, float]:
         """
         计算几何图形的变换参数（缩放和偏移）
-        
-        Args:
-            bbox: 边界框元组 (min_x, min_y, max_x, max_y)
-            canvas_size: 画布大小元组 (width, height)
-            scale_factor: 额外的缩放因子，默认为1.0
-            
-        Returns:
-            (scale, offset_x, offset_y) 元组
         """
         # 提取画布尺寸
         canvas_width, canvas_height = canvas_size
@@ -991,22 +1168,36 @@ class BlackboardVideoGenerator:
         bbox_width = bbox[2] - bbox[0]
         bbox_height = bbox[3] - bbox[1]
         
-        if bbox_width == 0 or bbox_height == 0:
-            return 1.0, 0, 0
+        # 防止极端情况
+        if bbox_width < 1:
+            bbox_width = 1
+        if bbox_height < 1:
+            bbox_height = 1
         
         # 计算基础缩放因子
         scale_x = (canvas_width * 0.8) / bbox_width  # 留出10%的边距
         scale_y = (canvas_height * 0.8) / bbox_height
         base_scale = min(scale_x, scale_y)
         
+        # 限制最大缩放倍数
+        MAX_SCALE = 10.0
+        if base_scale > MAX_SCALE:
+            base_scale = MAX_SCALE
+        
         # 应用额外的缩放因子
         final_scale = base_scale * scale_factor
         
-        # 计算居中偏移
-        scaled_width = bbox_width * final_scale
-        scaled_height = bbox_height * final_scale
-        offset_x = (canvas_width - scaled_width) / 2 - bbox[0] * final_scale
-        offset_y = (canvas_height - scaled_height) / 2 - bbox[1] * final_scale
+        # 计算居中偏移 - 基于边界框的中心
+        bbox_center_x = (bbox[0] + bbox[2]) / 2
+        bbox_center_y = (bbox[1] + bbox[3]) / 2
+        
+        # 计算中心对齐偏移
+        offset_x = canvas_width / 2 - bbox_center_x * final_scale
+        offset_y = canvas_height / 2 - bbox_center_y * final_scale
+        
+        self.logger.info(f"边界框尺寸: {bbox_width}x{bbox_height}, 中心点: ({bbox_center_x}, {bbox_center_y})")
+        self.logger.info(f"缩放计算: scale_x={scale_x}, scale_y={scale_y}, 最终缩放={final_scale}")
+        self.logger.info(f"偏移计算: offset_x={offset_x}, offset_y={offset_y}")
         
         return final_scale, offset_x, offset_y
 

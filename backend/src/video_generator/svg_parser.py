@@ -21,16 +21,16 @@ class SVGPathParser:
             路径点列表
         """
         try:
-            # 更全面的路径解析，支持M,L,Z命令和空格分隔
+            # 更全面的路径解析，支持M,L,Z,A命令和空格分隔
             points = []
             # 使用正则表达式提取命令和坐标
-            pattern = r'([MLZ])\s*([^MLZ]*)'
+            pattern = r'([MLZAmlza])\s*([^MLZAmlza]*)'  # 匹配M,L,Z,A命令
             
             current_pos = (0, 0)
             start_pos = (0, 0)
             
             for match in re.finditer(pattern, path_data):
-                cmd = match.group(1)
+                cmd = match.group(1).upper()  # 统一转为大写处理
                 params = match.group(2).strip()
                 
                 # 处理空格或逗号分隔的坐标
@@ -46,6 +46,24 @@ class SVGPathParser:
                 elif cmd == 'L' and len(coords) >= 2:
                     x = float(coords[0])
                     y = float(coords[1])
+                    current_pos = (x, y)
+                    points.append(current_pos)
+                    
+                elif cmd == 'A' and len(coords) >= 7:
+                    # 处理弧形命令，简化为直线
+                    # A rx ry x-axis-rotation large-arc-flag sweep-flag x y
+                    x = float(coords[5])  # 目标x坐标
+                    y = float(coords[6])  # 目标y坐标
+                    # 添加中间点来模拟弧形
+                    if current_pos != (0, 0):
+                        # 添加几个中间点来模拟曲线
+                        mid_x = (current_pos[0] + x) / 2
+                        mid_y = (current_pos[1] + y) / 2
+                        # 稍微偏移中间点，使其不在直线上
+                        rx = float(coords[0])  # 弧形的x半径
+                        offset = rx / 2
+                        points.append((mid_x + offset, mid_y - offset))
+                    
                     current_pos = (x, y)
                     points.append(current_pos)
                     
