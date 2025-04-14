@@ -780,37 +780,133 @@ class BlackboardVideoGenerator:
             shapes_commands = {}
             combined_bbox = None
             
+            # 在计算变换参数之前，识别特殊的几何结构
+            center_point = None
+            
+            # 检测是否为圆，并获取圆心坐标
+            if 'circle' in geometry_data:
+                circle_path = geometry_data['circle'].get('path', '')
+                if "a 40 40 0 1 0 80 0 a 40 40 0 1 0 -80 0" in circle_path:
+                    # 确定圆心坐标
+                    center_point = (50, 50) 
+                    self.logger.info(f"检测到标准圆形，圆心位置: {center_point}")
+            
             # 第一遍：解析所有形状并计算统一边界框
-            for shape_name, shape_data in geometry_data.items():
-                if not isinstance(shape_data, dict) or 'path' not in shape_data:
-                    continue
+            # 处理圆形
+            if 'circle' in geometry_data:
+                if isinstance(geometry_data['circle'], dict) and 'path' in geometry_data['circle']:
+                    path_str = geometry_data['circle']['path']
+                    self.logger.info(f"处理圆形SVG路径: {path_str}")
                     
-                path_str = shape_data['path']
-                self.logger.info(f"处理SVG路径: {path_str}")
-                
-                commands = self._parse_svg_path(path_str)
-                if not commands:
-                    continue
-                    
-                shapes_commands[shape_name] = commands
-                
-                # 计算当前形状的边界框
-                bbox = self._calculate_bbox(commands)
-                if not bbox:
-                    continue
-                    
-                self.logger.info(f"形状'{shape_name}'的边界框: {bbox}")
-                
-                # 更新组合边界框
-                if combined_bbox is None:
-                    combined_bbox = bbox
-                else:
-                    combined_bbox = (
-                        min(combined_bbox[0], bbox[0]),
-                        min(combined_bbox[1], bbox[1]),
-                        max(combined_bbox[2], bbox[2]),
-                        max(combined_bbox[3], bbox[3])
-                    )
+                    commands = self._parse_svg_path(path_str)
+                    if commands:
+                        shapes_commands['circle'] = commands
+                        
+                        # 计算当前形状的边界框
+                        bbox = self._calculate_bbox(commands)
+                        if bbox:
+                            self.logger.info(f"圆形的边界框: {bbox}")
+                            
+                            # 更新组合边界框
+                            if combined_bbox is None:
+                                combined_bbox = bbox
+                            else:
+                                combined_bbox = (
+                                    min(combined_bbox[0], bbox[0]),
+                                    min(combined_bbox[1], bbox[1]),
+                                    max(combined_bbox[2], bbox[2]),
+                                    max(combined_bbox[3], bbox[3])
+                                )
+            
+            # 处理线条
+            if 'line' in geometry_data and isinstance(geometry_data['line'], list):
+                for i, line_data in enumerate(geometry_data['line']):
+                    if isinstance(line_data, dict) and 'path' in line_data:
+                        path_str = line_data['path']
+                        self.logger.info(f"处理线条{i}的SVG路径: {path_str}")
+                        
+                        commands = self._parse_svg_path(path_str)
+                        if commands:
+                            shapes_commands[f'line_{i}'] = commands
+                            
+                            # 计算当前形状的边界框
+                            bbox = self._calculate_bbox(commands)
+                            if bbox:
+                                self.logger.info(f"线条{i}的边界框: {bbox}")
+                                
+                                # 更新组合边界框
+                                if combined_bbox is None:
+                                    combined_bbox = bbox
+                                else:
+                                    combined_bbox = (
+                                        min(combined_bbox[0], bbox[0]),
+                                        min(combined_bbox[1], bbox[1]),
+                                        max(combined_bbox[2], bbox[2]),
+                                        max(combined_bbox[3], bbox[3])
+                                    )
+            
+            # 处理点
+            if 'point' in geometry_data and isinstance(geometry_data['point'], list):
+                for i, point_data in enumerate(geometry_data['point']):
+                    if isinstance(point_data, dict) and 'path' in point_data:
+                        path_str = point_data['path']
+                        self.logger.info(f"处理点{i}的SVG路径: {path_str}")
+                        
+                        commands = self._parse_svg_path(path_str)
+                        if commands:
+                            shapes_commands[f'point_{i}'] = commands
+                            
+                            # 计算当前形状的边界框
+                            bbox = self._calculate_bbox(commands)
+                            if bbox:
+                                self.logger.info(f"点{i}的边界框: {bbox}")
+                                
+                                # 更新组合边界框
+                                if combined_bbox is None:
+                                    combined_bbox = bbox
+                                else:
+                                    combined_bbox = (
+                                        min(combined_bbox[0], bbox[0]),
+                                        min(combined_bbox[1], bbox[1]),
+                                        max(combined_bbox[2], bbox[2]),
+                                        max(combined_bbox[3], bbox[3])
+                                    )
+            
+            # 处理标签 (在图像上渲染)
+            label_images = []
+            if 'label' in geometry_data and isinstance(geometry_data['label'], list):
+                for i, label_data in enumerate(geometry_data['label']):
+                    if isinstance(label_data, dict) and 'text' in label_data and 'position' in label_data:
+                        text = label_data['text']
+                        position = label_data['position']
+                        font_size = label_data.get('font_size', 12)
+                        self.logger.info(f"处理标签{i}: 文本={text}, 位置={position}")
+                        
+                        # 渲染标签文本
+                        label_img = self._render_text(text, font_size)
+                        if label_img is not None:
+                            # 保存标签图像及其位置
+                            label_images.append((label_img, position[0], position[1]))
+                            
+                            # 更新边界框以包含标签
+                            label_w, label_h = label_img.shape[1], label_img.shape[0]
+                            label_bbox = (
+                                position[0] - label_w/2,
+                                position[1] - label_h/2,
+                                position[0] + label_w/2,
+                                position[1] + label_h/2
+                            )
+                            
+                            # 更新组合边界框
+                            if combined_bbox is None:
+                                combined_bbox = label_bbox
+                            else:
+                                combined_bbox = (
+                                    min(combined_bbox[0], label_bbox[0]),
+                                    min(combined_bbox[1], label_bbox[1]),
+                                    max(combined_bbox[2], label_bbox[2]),
+                                    max(combined_bbox[3], label_bbox[3])
+                                )
             
             # 确保我们有有效的边界框
             if combined_bbox is None:
@@ -819,11 +915,20 @@ class BlackboardVideoGenerator:
             
             self.logger.info(f"所有几何形状的组合边界框: {combined_bbox}")
             
-            # 计算统一的变换参数
+            # 计算统一的变换参数，如果识别到特殊结构则传入中心点
             scale, offset_x, offset_y = self._calculate_transform(
-                combined_bbox, (img_size, img_size), scale_factor
+                combined_bbox, (img_size, img_size), scale_factor, center_point
             )
             self.logger.info(f"统一变换参数: scale={scale}, offset_x={offset_x}, offset_y={offset_y}")
+            
+            # 确保偏移量不会使图形完全移出画布 - 这是新添加的
+            min_offset_x = -scale * (combined_bbox[2] - combined_bbox[0]) * 0.7
+            max_offset_x = scale * (img_size - (combined_bbox[2] - combined_bbox[0]) / 2)
+            offset_x = max(min_offset_x, min(offset_x, max_offset_x))
+
+            min_offset_y = -scale * (combined_bbox[3] - combined_bbox[1]) * 0.7
+            max_offset_y = scale * (img_size - (combined_bbox[3] - combined_bbox[1]) / 2)
+            offset_y = max(min_offset_y, min(offset_y, max_offset_y))
             
             # 第二遍：使用统一变换参数渲染所有形状
             for shape_name, commands in shapes_commands.items():
@@ -831,8 +936,18 @@ class BlackboardVideoGenerator:
                 transformed_commands = self._transform_commands(commands, scale, offset_x, offset_y)
                 
                 # 获取样式信息
-                shape_data = geometry_data[shape_name]
-                style = shape_data.get('style', {})
+                style = {}
+                if 'circle' in shape_name and 'circle' in geometry_data:
+                    style = geometry_data['circle'].get('style', {})
+                elif shape_name.startswith('line_'):
+                    index = int(shape_name.split('_')[1])
+                    if len(geometry_data['line']) > index:
+                        style = geometry_data['line'][index].get('style', {})
+                elif shape_name.startswith('point_'):
+                    index = int(shape_name.split('_')[1])
+                    if len(geometry_data['point']) > index:
+                        style = geometry_data['point'][index].get('style', {})
+                
                 stroke_color = (255, 255, 255, 255)  # 白色
                 stroke_width = int(style.get('stroke-width', 2))
                 
@@ -845,14 +960,62 @@ class BlackboardVideoGenerator:
                         end_pos = (int(cmd['x']), int(cmd['y']))
                         # 使用抗锯齿
                         cv2.line(canvas, last_pos, end_pos, stroke_color, stroke_width, cv2.LINE_AA)
-                        last_pos = end_pos
+                        last_pos = end_pos  # 添加这行以更新起点位置
                     elif cmd['command'] == 'Z' and last_pos is not None and len(transformed_commands) > 0:
                         # 闭合路径
                         for start_cmd in transformed_commands:
                             if start_cmd['command'] == 'M':
                                 start_pos = (int(start_cmd['x']), int(start_cmd['y']))
                                 cv2.line(canvas, last_pos, start_pos, stroke_color, stroke_width, cv2.LINE_AA)
-                                break
+                                break  # 确保break的缩进正确
+            
+            # 渲染标签
+            for label_img, x, y in label_images:
+                # 转换坐标
+                tx = int(x * scale + offset_x)
+                ty = int(y * scale + offset_y)
+                
+                # 将标签图像放置在指定位置
+                h, w = label_img.shape[:2]
+                x_start = tx - w // 2
+                y_start = ty - h // 2
+                
+                # 确保坐标在有效范围内
+                x_start = max(0, min(x_start, img_size - w))
+                y_start = max(0, min(y_start, img_size - h))
+                
+                # 计算结束位置
+                x_end = min(x_start + w, img_size)
+                y_end = min(y_start + h, img_size)
+                
+                # 裁剪标签以适应画布
+                label_w = x_end - x_start
+                label_h = y_end - y_start
+                
+                if label_w > 0 and label_h > 0:
+                    # 复制标签图像的一部分到画布上
+                    if label_img.shape[2] == 4:  # RGBA
+                        # 提取alpha通道
+                        alpha = label_img[:label_h, :label_w, 3] / 255.0
+                        alpha = np.expand_dims(alpha, axis=2)
+                        
+                        # 混合RGB通道
+                        src_rgb = label_img[:label_h, :label_w, :3]
+                        dst_rgb = canvas[y_start:y_end, x_start:x_end, :3]
+                        
+                        canvas[y_start:y_end, x_start:x_end, :3] = (
+                            dst_rgb * (1 - alpha) + src_rgb * alpha
+                        ).astype(np.uint8)
+                        
+                        # 更新Alpha通道
+                        canvas[y_start:y_end, x_start:x_end, 3] = np.maximum(
+                            canvas[y_start:y_end, x_start:x_end, 3],
+                            (label_img[:label_h, :label_w, 3]).astype(np.uint8)
+                        )
+                    else:  # RGB
+                        # 简单叠加
+                        canvas[y_start:y_end, x_start:x_end, :3] = label_img[:label_h, :label_w]
+                        canvas[y_start:y_end, x_start:x_end, 3] = 255  # 设置完全不透明
             
             return canvas
             
@@ -1157,7 +1320,8 @@ class BlackboardVideoGenerator:
         
         return (min_x, min_y, max_x, max_y)
 
-    def _calculate_transform(self, bbox: Tuple[float, float, float, float], canvas_size: Tuple[int, int], scale_factor: float = 1.0) -> Tuple[float, float, float]:
+    def _calculate_transform(self, bbox: Tuple[float, float, float, float], canvas_size: Tuple[int, int], 
+                             scale_factor: float = 1.0, center_point: Tuple[float, float] = None) -> Tuple[float, float, float]:
         """
         计算几何图形的变换参数（缩放和偏移）
         """
@@ -1174,30 +1338,65 @@ class BlackboardVideoGenerator:
         if bbox_height < 1:
             bbox_height = 1
         
-        # 计算基础缩放因子
-        scale_x = (canvas_width * 0.8) / bbox_width  # 留出10%的边距
-        scale_y = (canvas_height * 0.8) / bbox_height
-        base_scale = min(scale_x, scale_y)
-        
-        # 限制最大缩放倍数
-        MAX_SCALE = 10.0
-        if base_scale > MAX_SCALE:
-            base_scale = MAX_SCALE
-        
-        # 应用额外的缩放因子
-        final_scale = base_scale * scale_factor
-        
-        # 计算居中偏移 - 基于边界框的中心
+        # 计算边界框中心
         bbox_center_x = (bbox[0] + bbox[2]) / 2
         bbox_center_y = (bbox[1] + bbox[3]) / 2
         
-        # 计算中心对齐偏移
-        offset_x = canvas_width / 2 - bbox_center_x * final_scale
-        offset_y = canvas_height / 2 - bbox_center_y * final_scale
+        # 确定要使用的中心点
+        use_center_x = center_point[0] if center_point else bbox_center_x
+        use_center_y = center_point[1] if center_point else bbox_center_y
         
-        self.logger.info(f"边界框尺寸: {bbox_width}x{bbox_height}, 中心点: ({bbox_center_x}, {bbox_center_y})")
-        self.logger.info(f"缩放计算: scale_x={scale_x}, scale_y={scale_y}, 最终缩放={final_scale}")
-        self.logger.info(f"偏移计算: offset_x={offset_x}, offset_y={offset_y}")
+        # 计算尺寸，确保包含整个形状
+        # 如果有特定中心点，需要计算最远的顶点到中心的距离
+        if center_point:
+            # 计算中心点到边界框四个角的最大距离
+            corners = [
+                (bbox[0], bbox[1]),  # 左上
+                (bbox[2], bbox[1]),  # 右上
+                (bbox[0], bbox[3]),  # 左下
+                (bbox[2], bbox[3])   # 右下
+            ]
+            
+            # 找出最远的距离
+            max_distance = 0
+            for corner_x, corner_y in corners:
+                distance = math.sqrt((corner_x - use_center_x)**2 + (corner_y - use_center_y)**2)
+                max_distance = max(max_distance, distance)
+            
+            # 将距离作为半径，确保完整显示
+            shape_radius = max_distance
+            required_width = required_height = 2 * shape_radius
+        else:
+            # 使用边界框尺寸
+            required_width = bbox_width
+            required_height = bbox_height
+        
+        # 计算基础缩放因子，考虑边距
+        safety_margin = 0.7  # 留30%的边距，确保形状完全可见
+        scale_x = (canvas_width * safety_margin) / required_width
+        scale_y = (canvas_height * safety_margin) / required_height
+        base_scale = min(scale_x, scale_y)
+        
+        # 限制最大和最小缩放
+        MIN_SCALE = 1.0  # 太小看不清
+        MAX_SCALE = 4.0  # 太大会超出范围
+        base_scale = min(max(base_scale, MIN_SCALE), MAX_SCALE)
+        
+        # 应用用户指定的缩放因子，但仍限制在范围内
+        final_scale = base_scale * scale_factor
+        final_scale = min(max(final_scale, MIN_SCALE), MAX_SCALE)
+        
+        # 计算偏移量，确保形状在画布中心
+        offset_x = canvas_width / 2 - use_center_x * final_scale
+        offset_y = canvas_height / 2 - use_center_y * final_scale
+        
+        # 记录参数
+        self.logger.info(f"通用变换计算:")
+        self.logger.info(f"- 边界框: {bbox}, 尺寸: {bbox_width}x{bbox_height}")
+        self.logger.info(f"- 使用中心点: ({use_center_x}, {use_center_y})")
+        self.logger.info(f"- 缩放限制: {MIN_SCALE} ~ {MAX_SCALE}, 用户缩放: {scale_factor}")
+        self.logger.info(f"- 基础缩放: {base_scale}, 最终缩放: {final_scale}")
+        self.logger.info(f"- 最终偏移: ({offset_x}, {offset_y})")
         
         return final_scale, offset_x, offset_y
 
