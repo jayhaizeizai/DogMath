@@ -785,9 +785,13 @@ class BlackboardVideoGenerator:
             shapes_commands = {}
             combined_bbox = None
             
-            # 修改这部分代码来处理triangle1, lineBD, lineCD
+            # 修改这部分代码来处理不同类型的几何图形
             for shape_name, shape_data in actual_data.items():
-                if isinstance(shape_data, dict) and 'path' in shape_data and 'style' in shape_data:
+                # 特殊处理标签数组
+                if shape_name == "label":
+                    continue
+                
+                if isinstance(shape_data, dict) and 'path' in shape_data:
                     path_str = shape_data['path']
                     self.logger.info(f"处理形状 {shape_name} 的SVG路径: {path_str}")
                     
@@ -810,89 +814,6 @@ class BlackboardVideoGenerator:
                                     max(combined_bbox[2], bbox[2]),
                                     max(combined_bbox[3], bbox[3])
                                 )
-            
-            # 检测特殊的几何结构
-            center_point = None
-            
-            # 处理圆形
-            if 'circle' in actual_data:
-                if isinstance(actual_data['circle'], dict) and 'path' in actual_data['circle']:
-                    path_str = actual_data['circle']['path']
-                    self.logger.info(f"处理圆形SVG路径: {path_str}")
-                    
-                    commands = self._parse_svg_path(path_str)
-                    if commands:
-                        shapes_commands['circle'] = commands
-                        
-                        # 计算当前形状的边界框
-                        bbox = self._calculate_bbox(commands)
-                        if bbox:
-                            self.logger.info(f"圆形的边界框: {bbox}")
-                            
-                            # 更新组合边界框
-                            if combined_bbox is None:
-                                combined_bbox = bbox
-                            else:
-                                combined_bbox = (
-                                    min(combined_bbox[0], bbox[0]),
-                                    min(combined_bbox[1], bbox[1]),
-                                    max(combined_bbox[2], bbox[2]),
-                                    max(combined_bbox[3], bbox[3])
-                                )
-            
-            # 处理线条
-            if 'line' in actual_data and isinstance(actual_data['line'], list):
-                for i, line_data in enumerate(actual_data['line']):
-                    if isinstance(line_data, dict) and 'path' in line_data:
-                        path_str = line_data['path']
-                        self.logger.info(f"处理线条{i}的SVG路径: {path_str}")
-                        
-                        commands = self._parse_svg_path(path_str)
-                        if commands:
-                            shapes_commands[f'line_{i}'] = commands
-                            
-                            # 计算当前形状的边界框
-                            bbox = self._calculate_bbox(commands)
-                            if bbox:
-                                self.logger.info(f"线条{i}的边界框: {bbox}")
-                                
-                                # 更新组合边界框
-                                if combined_bbox is None:
-                                    combined_bbox = bbox
-                                else:
-                                    combined_bbox = (
-                                        min(combined_bbox[0], bbox[0]),
-                                        min(combined_bbox[1], bbox[1]),
-                                        max(combined_bbox[2], bbox[2]),
-                                        max(combined_bbox[3], bbox[3])
-                                    )
-            
-            # 处理点
-            if 'point' in actual_data and isinstance(actual_data['point'], list):
-                for i, point_data in enumerate(actual_data['point']):
-                    if isinstance(point_data, dict) and 'path' in point_data:
-                        path_str = point_data['path']
-                        self.logger.info(f"处理点{i}的SVG路径: {path_str}")
-                        
-                        commands = self._parse_svg_path(path_str)
-                        if commands:
-                            shapes_commands[f'point_{i}'] = commands
-                            
-                            # 计算当前形状的边界框
-                            bbox = self._calculate_bbox(commands)
-                            if bbox:
-                                self.logger.info(f"点{i}的边界框: {bbox}")
-                                
-                                # 更新组合边界框
-                                if combined_bbox is None:
-                                    combined_bbox = bbox
-                                else:
-                                    combined_bbox = (
-                                        min(combined_bbox[0], bbox[0]),
-                                        min(combined_bbox[1], bbox[1]),
-                                        max(combined_bbox[2], bbox[2]),
-                                        max(combined_bbox[3], bbox[3])
-                                    )
             
             # 处理标签 (在图像上渲染)
             label_images = []
@@ -937,13 +858,16 @@ class BlackboardVideoGenerator:
             
             self.logger.info(f"所有几何形状的组合边界框: {combined_bbox}")
             
+            # 检测特殊的几何结构
+            center_point = None
+            
             # 计算统一的变换参数，如果识别到特殊结构则传入中心点
             scale, offset_x, offset_y = self._calculate_transform(
                 combined_bbox, (img_size, img_size), scale_factor, center_point
             )
             self.logger.info(f"统一变换参数: scale={scale}, offset_x={offset_x}, offset_y={offset_y}")
             
-            # 确保偏移量不会使图形完全移出画布 - 这是新添加的
+            # 确保偏移量不会使图形完全移出画布
             min_offset_x = -scale * (combined_bbox[2] - combined_bbox[0]) * 0.7
             max_offset_x = scale * (img_size - (combined_bbox[2] - combined_bbox[0]) / 2)
             offset_x = max(min_offset_x, min(offset_x, max_offset_x))
@@ -957,8 +881,13 @@ class BlackboardVideoGenerator:
                 # 应用统一变换
                 transformed_commands = self._transform_commands(commands, scale, offset_x, offset_y)
                 
+                # 获取原始形状数据以提取样式
+                original_shape_data = actual_data.get(shape_name)
+                if not isinstance(original_shape_data, dict):
+                    continue
+                
                 # 获取样式信息
-                style = shape_data.get('style', {})
+                style = original_shape_data.get('style', {})
                 stroke_color = (255, 255, 255, 255)  # 默认白色
                 stroke_width = int(style.get('stroke-width', 2))
                 
@@ -977,14 +906,14 @@ class BlackboardVideoGenerator:
                         end_pos = (int(cmd['x']), int(cmd['y']))
                         # 使用抗锯齿
                         cv2.line(canvas, last_pos, end_pos, stroke_color, stroke_width, cv2.LINE_AA)
-                        last_pos = end_pos  # 添加这行以更新起点位置
+                        last_pos = end_pos  # 更新起点位置
                     elif cmd['command'] == 'Z' and last_pos is not None and len(transformed_commands) > 0:
                         # 闭合路径
                         for start_cmd in transformed_commands:
                             if start_cmd['command'] == 'M':
                                 start_pos = (int(start_cmd['x']), int(start_cmd['y']))
                                 cv2.line(canvas, last_pos, start_pos, stroke_color, stroke_width, cv2.LINE_AA)
-                                break  # 确保break的缩进正确
+                                break
             
             # 渲染标签
             for label_img, x, y in label_images:
