@@ -776,26 +776,48 @@ class BlackboardVideoGenerator:
             if not isinstance(geometry_data, dict):
                 raise ValueError("几何数据必须是字典类型")
             
-            # 首先解析所有形状，计算整体边界框
+            # 处理content字段包装的情况
+            actual_data = geometry_data.get('content', geometry_data)
+            
+            self.logger.info(f"处理几何数据结构: {actual_data.keys()}")
+            
+            # 使用处理后的数据继续执行
             shapes_commands = {}
             combined_bbox = None
             
-            # 在计算变换参数之前，识别特殊的几何结构
+            # 修改这部分代码来处理triangle1, lineBD, lineCD
+            for shape_name, shape_data in actual_data.items():
+                if isinstance(shape_data, dict) and 'path' in shape_data and 'style' in shape_data:
+                    path_str = shape_data['path']
+                    self.logger.info(f"处理形状 {shape_name} 的SVG路径: {path_str}")
+                    
+                    commands = self._parse_svg_path(path_str)
+                    if commands:
+                        shapes_commands[shape_name] = commands
+                        
+                        # 计算当前形状的边界框
+                        bbox = self._calculate_bbox(commands)
+                        if bbox:
+                            self.logger.info(f"形状 {shape_name} 的边界框: {bbox}")
+                            
+                            # 更新组合边界框
+                            if combined_bbox is None:
+                                combined_bbox = bbox
+                            else:
+                                combined_bbox = (
+                                    min(combined_bbox[0], bbox[0]),
+                                    min(combined_bbox[1], bbox[1]),
+                                    max(combined_bbox[2], bbox[2]),
+                                    max(combined_bbox[3], bbox[3])
+                                )
+            
+            # 检测特殊的几何结构
             center_point = None
             
-            # 检测是否为圆，并获取圆心坐标
-            if 'circle' in geometry_data:
-                circle_path = geometry_data['circle'].get('path', '')
-                if "a 40 40 0 1 0 80 0 a 40 40 0 1 0 -80 0" in circle_path:
-                    # 确定圆心坐标
-                    center_point = (50, 50) 
-                    self.logger.info(f"检测到标准圆形，圆心位置: {center_point}")
-            
-            # 第一遍：解析所有形状并计算统一边界框
             # 处理圆形
-            if 'circle' in geometry_data:
-                if isinstance(geometry_data['circle'], dict) and 'path' in geometry_data['circle']:
-                    path_str = geometry_data['circle']['path']
+            if 'circle' in actual_data:
+                if isinstance(actual_data['circle'], dict) and 'path' in actual_data['circle']:
+                    path_str = actual_data['circle']['path']
                     self.logger.info(f"处理圆形SVG路径: {path_str}")
                     
                     commands = self._parse_svg_path(path_str)
@@ -819,8 +841,8 @@ class BlackboardVideoGenerator:
                                 )
             
             # 处理线条
-            if 'line' in geometry_data and isinstance(geometry_data['line'], list):
-                for i, line_data in enumerate(geometry_data['line']):
+            if 'line' in actual_data and isinstance(actual_data['line'], list):
+                for i, line_data in enumerate(actual_data['line']):
                     if isinstance(line_data, dict) and 'path' in line_data:
                         path_str = line_data['path']
                         self.logger.info(f"处理线条{i}的SVG路径: {path_str}")
@@ -846,8 +868,8 @@ class BlackboardVideoGenerator:
                                     )
             
             # 处理点
-            if 'point' in geometry_data and isinstance(geometry_data['point'], list):
-                for i, point_data in enumerate(geometry_data['point']):
+            if 'point' in actual_data and isinstance(actual_data['point'], list):
+                for i, point_data in enumerate(actual_data['point']):
                     if isinstance(point_data, dict) and 'path' in point_data:
                         path_str = point_data['path']
                         self.logger.info(f"处理点{i}的SVG路径: {path_str}")
@@ -874,8 +896,8 @@ class BlackboardVideoGenerator:
             
             # 处理标签 (在图像上渲染)
             label_images = []
-            if 'label' in geometry_data and isinstance(geometry_data['label'], list):
-                for i, label_data in enumerate(geometry_data['label']):
+            if 'label' in actual_data and isinstance(actual_data['label'], list):
+                for i, label_data in enumerate(actual_data['label']):
                     if isinstance(label_data, dict) and 'text' in label_data and 'position' in label_data:
                         text = label_data['text']
                         position = label_data['position']
@@ -936,20 +958,15 @@ class BlackboardVideoGenerator:
                 transformed_commands = self._transform_commands(commands, scale, offset_x, offset_y)
                 
                 # 获取样式信息
-                style = {}
-                if 'circle' in shape_name and 'circle' in geometry_data:
-                    style = geometry_data['circle'].get('style', {})
-                elif shape_name.startswith('line_'):
-                    index = int(shape_name.split('_')[1])
-                    if len(geometry_data['line']) > index:
-                        style = geometry_data['line'][index].get('style', {})
-                elif shape_name.startswith('point_'):
-                    index = int(shape_name.split('_')[1])
-                    if len(geometry_data['point']) > index:
-                        style = geometry_data['point'][index].get('style', {})
-                
-                stroke_color = (255, 255, 255, 255)  # 白色
+                style = shape_data.get('style', {})
+                stroke_color = (255, 255, 255, 255)  # 默认白色
                 stroke_width = int(style.get('stroke-width', 2))
+                
+                # 根据样式设置渲染颜色
+                if style.get('stroke') == 'yellow':
+                    stroke_color = (255, 255, 0, 255)  # 黄色
+                elif style.get('stroke') == 'white':
+                    stroke_color = (255, 255, 255, 255)  # 白色
                 
                 # 渲染路径
                 last_pos = None
@@ -1371,16 +1388,17 @@ class BlackboardVideoGenerator:
             required_width = bbox_width
             required_height = bbox_height
         
-        # 计算基础缩放因子，考虑边距
-        safety_margin = 0.7  # 留30%的边距，确保形状完全可见
+        # 调整安全边距，确保图形完全可见
+        safety_margin = 0.8  # 增加到0.8，给图形更多显示空间
+        
+        # 计算基础缩放因子时考虑整体图形大小
         scale_x = (canvas_width * safety_margin) / required_width
         scale_y = (canvas_height * safety_margin) / required_height
         base_scale = min(scale_x, scale_y)
         
-        # 限制最大和最小缩放
-        MIN_SCALE = 1.0  # 太小看不清
-        MAX_SCALE = 4.0  # 太大会超出范围
-        base_scale = min(max(base_scale, MIN_SCALE), MAX_SCALE)
+        # 调整最小缩放值
+        MIN_SCALE = 0.5  # 降低最小缩放限制
+        MAX_SCALE = 4.0
         
         # 应用用户指定的缩放因子，但仍限制在范围内
         final_scale = base_scale * scale_factor
