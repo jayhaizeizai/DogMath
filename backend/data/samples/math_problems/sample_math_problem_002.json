@@ -18,7 +18,7 @@
           {
             "type": "formula",
             "content": "\\sqrt{2}",
-            "position": [960, 540],
+            "position": [0.5, 0.5],
             "font_size": 128,
             "animation": {
               "enter": "fade_in",
@@ -26,6 +26,49 @@
             }
           }
         ]
+      }
+    ]
+  },
+  "audio": {
+    "narration": [
+      {
+        "text": "这是根号2，它是一个无理数，表示2的平方根。",
+        "start_time": 0,
+        "end_time": 5,
+        "voice_config": {
+          "speaker": "teacher_female",
+          "speed": 1.0,
+          "pitch": 1.0
+        },
+        "ssml": "<speak>这是<say-as interpret-as=\"math\">根号2</say-as>，它是一个无理数，表示<emphasis>2的平方根</emphasis>。</speak>"
+      }
+    ],
+    "background_music": "soft_piano"
+  },
+  "annotations": {
+    "key_points": [
+      {
+        "time": 2,
+        "text": "根号是一种数学符号，表示求平方根",
+        "importance": "high"
+      }
+    ]
+  },
+  "virtual_presenter": {
+    "model": "teacher_female",
+    "position": [0.1, 0.7],
+    "size": 0.3,
+    "gestures": [
+      {
+        "type": "point",
+        "target_position": [0.5, 0.5],
+        "start_time": 1,
+        "duration": 2
+      },
+      {
+        "type": "explain",
+        "start_time": 3,
+        "duration": 2
       }
     ]
   }
