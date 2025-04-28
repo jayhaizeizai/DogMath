@@ -5,6 +5,7 @@ import os
 import sys
 import json
 from pathlib import Path
+from typing import Optional
 from loguru import logger
 
 # 添加项目根目录到系统路径
@@ -12,6 +13,15 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirna
 
 # 使用绝对导入
 from backend.src.audio_generator import GoogleTextToSpeech
+
+# 尝试导入配置文件
+try:
+    from backend.src.audio_generator.config import TEXT_TO_SPEECH
+except ImportError:
+    TEXT_TO_SPEECH = {
+        "default_language": "zh-CN",
+        "default_voice": "zh-CN-Standard-A"
+    }
 
 # 配置loguru日志
 log_path = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))) / "logs" / "audio_generator.log"
@@ -38,11 +48,8 @@ def generate_audio_from_json(json_path: str, output_path: str):
             logger.warning("没有找到旁白数据")
             return
             
-        # 创建TTS实例
-        tts = GoogleTextToSpeech(
-            language_code="zh-CN",
-            voice_name="zh-CN-Standard-A"
-        )
+        # 创建TTS实例，会自动从config.py加载API密钥
+        tts = GoogleTextToSpeech()
         
         # 提取文本内容
         texts = []
@@ -83,18 +90,18 @@ def generate_audio_from_json(json_path: str, output_path: str):
         logger.error(f"音频生成失败: {str(e)}")
         raise
 
-def generate_simple_audio(text: str, output_path: str, language_code: str = "en-US", voice_name: str = "en-US-Chirp3-HD-Leda"):
+def generate_simple_audio(text: str, output_path: str, language_code: Optional[str] = None, voice_name: Optional[str] = None):
     """
     生成简单的音频文件
     
     Args:
         text: 文本内容
         output_path: 输出文件路径
-        language_code: 语言代码
-        voice_name: 声音名称
+        language_code: 语言代码，如果为None则使用配置文件中的默认值
+        voice_name: 声音名称，如果为None则使用配置文件中的默认值
     """
     try:
-        # 创建TTS实例
+        # 创建TTS实例，会自动从config.py加载API密钥
         tts = GoogleTextToSpeech(
             language_code=language_code,
             voice_name=voice_name
@@ -128,8 +135,8 @@ if __name__ == '__main__':
         output_path = sys.argv[3]
         
         # 可选参数
-        language_code = sys.argv[4] if len(sys.argv) > 4 else "en-US"
-        voice_name = sys.argv[5] if len(sys.argv) > 5 else "en-US-Chirp3-HD-Leda"
+        language_code = sys.argv[4] if len(sys.argv) > 4 else None
+        voice_name = sys.argv[5] if len(sys.argv) > 5 else None
         
         # 确保输出目录存在
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)

@@ -42,4 +42,7 @@ samples/
 
 # 其他
 fix_indentation.py
-screenshot_check.png 
+screenshot_check.png
+
+# 配置文件
+backend/src/audio_generator/config.py 

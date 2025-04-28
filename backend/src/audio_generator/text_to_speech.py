@@ -11,26 +11,59 @@ from loguru import logger
 
 from .utils.audio_utils import save_audio_to_wav, merge_audio_files
 
+# 尝试导入配置文件，如果不存在则使用默认值
+try:
+    from .config import GOOGLE_CLOUD, TEXT_TO_SPEECH
+    logger.info("已加载配置文件")
+except ImportError:
+    logger.warning("未找到config.py，使用默认配置")
+    GOOGLE_CLOUD = {
+        "api_key": None,
+        "service_account_file": None,
+        "use_api_key": True,
+        "project_id": None
+    }
+    TEXT_TO_SPEECH = {
+        "default_language": "zh-CN",
+        "default_voice": "zh-CN-Standard-A"
+    }
+
 class GoogleTextToSpeech:
     """
     Google Cloud TTS API 接口类
     """
     def __init__(self, 
-                 language_code: str = "zh-CN", 
-                 voice_name: str = "zh-CN-Standard-A",
-                 output_dir: Optional[str] = None):
+                 language_code: Optional[str] = None, 
+                 voice_name: Optional[str] = None,
+                 output_dir: Optional[str] = None,
+                 api_key: Optional[str] = None,
+                 service_account_file: Optional[str] = None):
         """
         初始化Google TTS客户端
         
         Args:
-            language_code: 语言代码
-            voice_name: 声音名称
+            language_code: 语言代码，如果为None则使用配置文件中的默认值
+            voice_name: 声音名称，如果为None则使用配置文件中的默认值
             output_dir: 音频输出目录
+            api_key: Google Cloud API密钥，如果未提供则使用配置文件
+            service_account_file: 服务账号密钥文件路径，如果未提供则使用配置文件
         """
-        self.language_code = language_code
-        self.voice_name = voice_name
+        # 从配置或参数获取语言和声音设置
+        self.language_code = language_code or TEXT_TO_SPEECH.get("default_language")
+        self.voice_name = voice_name or TEXT_TO_SPEECH.get("default_voice")
         self.output_dir = output_dir or os.path.join(os.getcwd(), "output", "audio")
         
+        # 认证信息 - 优先使用参数提供的值
+        self.api_key = api_key
+        self.service_account_file = service_account_file
+        
+        # 如果未提供认证信息，则使用配置文件中的值
+        if not self.api_key and not self.service_account_file:
+            if GOOGLE_CLOUD.get("use_api_key", True):
+                self.api_key = GOOGLE_CLOUD.get("api_key")
+            else:
+                self.service_account_file = GOOGLE_CLOUD.get("service_account_file")
+                
         # 确保输出目录存在
         os.makedirs(self.output_dir, exist_ok=True)
         
@@ -86,12 +119,38 @@ class GoogleTextToSpeech:
             # 构建curl命令
             curl_command = [
                 'curl', '-X', 'POST', 
-                '-H', 'Content-Type: application/json',
-                '-H', f'X-Goog-User-Project: $(gcloud config list --format=\'value(core.project)\')',
-                '-H', f'Authorization: Bearer $(gcloud auth print-access-token)',
+                '-H', 'Content-Type: application/json'
+            ]
+            
+            # 根据提供的认证方式添加认证头
+            if self.api_key:
+                # 使用API密钥
+                curl_command.extend(['-H', f'X-Goog-Api-Key: {self.api_key}'])
+            elif self.service_account_file:
+                # 使用服务账号
+                if os.path.exists(self.service_account_file):
+                    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = self.service_account_file
+                    curl_command.extend([
+                        '-H', f'Authorization: Bearer $(gcloud auth application-default print-access-token)'
+                    ])
+                else:
+                    logger.warning(f"服务账号文件不存在: {self.service_account_file}，使用默认认证")
+                    curl_command.extend([
+                        '-H', f'X-Goog-User-Project: $(gcloud config list --format=\'value(core.project)\')',
+                        '-H', f'Authorization: Bearer $(gcloud auth print-access-token)'
+                    ])
+            else:
+                # 使用默认的gcloud认证
+                curl_command.extend([
+                    '-H', f'X-Goog-User-Project: $(gcloud config list --format=\'value(core.project)\')',
+                    '-H', f'Authorization: Bearer $(gcloud auth print-access-token)'
+                ])
+                
+            # 添加数据和URL
+            curl_command.extend([
                 '--data', f'@{temp_file_path}',
                 'https://texttospeech.googleapis.com/v1/text:synthesize'
-            ]
+            ])
             
             # 执行curl命令并获取响应
             process = subprocess.Popen(
