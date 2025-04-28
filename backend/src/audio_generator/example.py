@@ -11,10 +11,10 @@ from loguru import logger
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
 
 # 使用绝对导入
-from backend.src.audio_processor import GoogleTextToSpeech
+from backend.src.audio_generator import GoogleTextToSpeech
 
 # 配置loguru日志
-log_path = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))) / "logs" / "audio_processor.log"
+log_path = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))) / "logs" / "audio_generator.log"
 logger.add(log_path, rotation="10 MB", retention="1 week", level="DEBUG", encoding="utf-8")
 
 def generate_audio_from_json(json_path: str, output_path: str):
