@@ -27,13 +27,13 @@
 
 ## 2. 处理流程
 
-### 2.1 入口文件：`backend/src/video_generator/example.py`
+### 2.1 入口文件：`backend/src/blackboard_video_generator/example.py`
 1. 加载配置文件
 2. 初始化日志系统
 3. 创建视频生成器实例
 4. 调用生成方法
 
-### 2.2 视频生成器：`backend/src/video_generator/blackboard_video_generator.py`
+### 2.2 视频生成器：`backend/src/blackboard_video_generator/blackboard_video_generator.py`
 1. 初始化阶段
    - 设置视频参数（分辨率、帧率等）
    - 初始化渲染器
@@ -49,7 +49,7 @@
    - 逐帧渲染元素
    - 应用动画效果
 
-### 2.3 动画处理：`backend/src/video_generator/blackboard_animator.py`
+### 2.3 动画处理：`backend/src/blackboard_video_generator/blackboard_animator.py`
 1. 动画功能实现
    - 动画效果管理
    - 帧动画控制
@@ -61,16 +61,16 @@
    - `render_geometry`: 几何图形渲染
 
 ### 2.4 工具类：
-1. SVG解析器：`backend/src/video_generator/svg_parser.py`
+1. SVG解析器：`backend/src/blackboard_video_generator/svg_parser.py`
    - SVG路径解析
    - 路径命令处理
    - 坐标转换
 
-2. 黑板纹理：`backend/src/video_generator/blackboard_texture.py`
+2. 黑板纹理：`backend/src/blackboard_video_generator/blackboard_texture.py`
    - 黑板背景生成
    - 纹理效果处理
 
-3. 动画效果：`backend/src/video_generator/animations.py`
+3. 动画效果：`backend/src/blackboard_video_generator/animations.py`
    - 动画效果定义
    - 动画参数处理
 

@@ -8,10 +8,10 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
 
 # 使用绝对导入
-from backend.src.video_generator import BlackboardVideoGenerator
+from backend.src.blackboard_video_generator import BlackboardVideoGenerator
 
 # 配置loguru日志
-log_path = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))) / "logs" / "video_generator.log"
+log_path = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))) / "logs" / "blackboard_video_generator.log"
 logger.add(log_path, rotation="10 MB", retention="1 week", level="DEBUG", encoding="utf-8")
 
 def generate_blackboard_video(json_path: str, output_path: str):
