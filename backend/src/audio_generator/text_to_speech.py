@@ -129,10 +129,53 @@ class GoogleTextToSpeech:
             elif self.service_account_file:
                 # 使用服务账号
                 if os.path.exists(self.service_account_file):
-                    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = self.service_account_file
-                    curl_command.extend([
-                        '-H', f'Authorization: Bearer $(gcloud auth application-default print-access-token)'
-                    ])
+                    # 设置环境变量并使用服务账号文件
+                    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = os.path.abspath(self.service_account_file)
+                    
+                    # 读取服务账号文件获取项目ID
+                    try:
+                        with open(self.service_account_file, 'r') as f:
+                            sa_data = json.load(f)
+                            project_id = sa_data.get('project_id')
+                    except Exception as e:
+                        logger.warning(f"无法读取服务账号文件获取项目ID: {str(e)}")
+                        project_id = GOOGLE_CLOUD.get("project_id")
+                    
+                    # 使用gcloud命令获取访问令牌
+                    try:
+                        # 直接使用Google应用默认凭据
+                        import google.auth
+                        from google.auth.transport.requests import Request as GoogleRequest
+                        
+                        # 获取凭据
+                        credentials, project = google.auth.default()
+                        
+                        # 确保凭据有效
+                        if credentials.expired:
+                            credentials.refresh(GoogleRequest())
+                        
+                        # 获取访问令牌
+                        token = credentials.token
+                        
+                        # 添加认证头
+                        curl_command.extend([
+                            '-H', f'Authorization: Bearer {token}'
+                        ])
+                        
+                        if project_id:
+                            curl_command.extend([
+                                '-H', f'X-Goog-User-Project: {project_id}'
+                            ])
+                    except ImportError:
+                        logger.warning("未安装google-auth库，回退到使用gcloud命令")
+                        # 使用gcloud命令获取访问令牌
+                        curl_command.extend([
+                            '-H', f'Authorization: Bearer $(gcloud auth application-default print-access-token)'
+                        ])
+                        if project_id:
+                            curl_command.extend([
+                                '-H', f'X-Goog-User-Project: {project_id}'
+                            ])
                 else:
                     logger.warning(f"服务账号文件不存在: {self.service_account_file}，使用默认认证")
                     curl_command.extend([
