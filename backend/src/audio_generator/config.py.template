@@ -1,0 +1,43 @@
+"""
+配置文件模板 - 重命名为config.py使用
+此配置文件包含TTS服务所需的API密钥和其他配置项
+"""
+
+# Google Cloud TTS 配置
+GOOGLE_CLOUD = {
+    # API密钥（使用API密钥认证时设置）
+    "api_key": None,
+    
+    # 服务账号文件路径（使用服务账号认证时设置）
+    "service_account_file": "/path/to/your/google-service-account.json",
+    
+    # 是否使用API密钥认证（True使用api_key，False使用service_account_file）
+    "use_api_key": False,
+    
+    # 项目ID（可选）
+    "project_id": "your-project-id",
+}
+
+# 火山引擎TTS配置
+VOLCANO_ENGINE = {
+    # 火山引擎Token（必填）
+    "token": "YOUR_TOKEN",
+    
+    # 火山引擎应用ID（必填）
+    "app_id": "YOUR_APPID",
+    
+    # 默认语音
+    "voice": "BV001_streaming",  # 可选值参见火山引擎文档
+}
+
+# 通用TTS配置
+TEXT_TO_SPEECH = {
+    # 默认语言
+    "default_language": "cmn-CN",  # 中文：cmn-CN, 英文：en-US
+    
+    # 默认声音（Google TTS）
+    "default_voice": "cmn-CN-Standard-A",
+    
+    # 中文检测阈值 - 当文本中中文字符比例超过此值时使用火山引擎
+    "chinese_threshold": 0.5,  # 0.0-1.0之间
+} 

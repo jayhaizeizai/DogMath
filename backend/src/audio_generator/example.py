@@ -1,5 +1,8 @@
 """
-示例脚本：演示如何使用 GoogleTextToSpeech 类按分段生成音频
+示例脚本：演示如何使用 LanguageRouterTTS 类按分段生成音频
+支持自动根据文本语言选择合适的TTS引擎：
+- 中文文本使用火山引擎
+- 英文和其他文本使用Google TTS
 """
 import os
 import sys
@@ -12,7 +15,7 @@ from loguru import logger
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
 
 # 使用绝对导入
-from backend.src.audio_generator import GoogleTextToSpeech
+from backend.src.audio_generator.language_router_tts import LanguageRouterTTS
 
 # 尝试导入配置文件
 try:
@@ -20,7 +23,8 @@ try:
 except ImportError:
     TEXT_TO_SPEECH = {
         "default_language": "zh-CN",
-        "default_voice": "zh-CN-Standard-A"
+        "default_voice": "zh-CN-Standard-A",
+        "chinese_threshold": 0.5
     }
 
 # 配置loguru日志
@@ -48,8 +52,8 @@ def generate_audio_from_json(json_path: str, output_path: str):
             logger.warning("没有找到旁白数据")
             return
             
-        # 创建TTS实例，会自动从config.py加载API密钥
-        tts = GoogleTextToSpeech()
+        # 创建TTS实例，会自动根据文本语言选择合适的TTS引擎
+        tts = LanguageRouterTTS()
         
         # 提取文本内容
         texts = []
@@ -101,16 +105,15 @@ def generate_simple_audio(text: str, output_path: str, language_code: Optional[s
         voice_name: 声音名称，如果为None则使用配置文件中的默认值
     """
     try:
-        # 创建TTS实例，会自动从config.py加载API密钥
-        tts = GoogleTextToSpeech(
-            language_code=language_code,
-            voice_name=voice_name
-        )
+        # 创建TTS实例，会自动根据文本语言选择合适的TTS引擎
+        tts = LanguageRouterTTS()
         
         # 生成音频
         audio_file = tts.synthesize_speech(
             text=text,
-            output_path=output_path
+            output_path=output_path,
+            language_code=language_code,
+            voice_name=voice_name
         )
         
         logger.info(f"音频生成完成：{audio_file}")
@@ -144,8 +147,8 @@ def generate_segmented_audio(json_path: str, output_dir: str) -> List[Dict[str, 
             logger.warning("没有找到旁白数据")
             return []
             
-        # 创建TTS实例，会自动从config.py加载API密钥
-        tts = GoogleTextToSpeech()
+        # 创建TTS实例，会自动根据文本语言选择合适的TTS引擎
+        tts = LanguageRouterTTS()
         
         # 确保输出目录存在
         os.makedirs(output_dir, exist_ok=True)
