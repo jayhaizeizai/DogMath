@@ -108,8 +108,6 @@ class VolcanoTextToSpeech:
                 "pitch_ratio": max(0.1, min(pitch_ratio, 3.0)),
                 "emotion": "neutral",
                 "language": _lang_to_api(language_code),
-                "enable_latex_tn": True,
-                "disable_markdown_filter": True,
             },
             "request": {
                 "reqid": str(uuid.uuid4()),

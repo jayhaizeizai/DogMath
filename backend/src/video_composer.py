@@ -1,0 +1,238 @@
+"""
+视频合成器：将黑板视频和音频片段合成为完整视频
+"""
+import os
+import sys
+import json
+import subprocess
+from pathlib import Path
+import tempfile
+from typing import List, Dict, Any
+from loguru import logger
+
+# 添加项目根目录到系统路径
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+
+# 配置loguru日志
+log_path = Path(os.path.dirname(os.path.dirname(__file__))) / "logs" / "video_composer.log"
+os.makedirs(log_path.parent, exist_ok=True)
+logger.add(log_path, rotation="10 MB", retention="1 week", level="DEBUG", encoding="utf-8")
+
+def run_command(cmd: List[str]) -> bool:
+    """
+    执行命令行命令
+    
+    Args:
+        cmd: 命令行命令列表
+        
+    Returns:
+        执行是否成功
+    """
+    try:
+        logger.info(f"执行命令: {' '.join(cmd)}")
+        process = subprocess.Popen(
+            cmd, 
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True
+        )
+        stdout, stderr = process.communicate()
+        
+        if process.returncode != 0:
+            logger.error(f"命令执行失败，错误信息: {stderr}")
+            return False
+            
+        logger.debug(f"命令执行成功，输出: {stdout}")
+        return True
+    except Exception as e:
+        logger.error(f"命令执行异常: {str(e)}")
+        return False
+
+def generate_audio_segments(json_path: str, output_dir: str) -> str:
+    """
+    生成音频片段
+    
+    Args:
+        json_path: 输入JSON文件路径
+        output_dir: 输出目录
+        
+    Returns:
+        音频元数据文件路径
+    """
+    cmd = [
+        sys.executable,
+        "backend/src/audio_generator/example.py",
+        "--segmented",
+        json_path,
+        output_dir
+    ]
+    
+    if run_command(cmd):
+        metadata_path = os.path.join(output_dir, "audio_metadata.json")
+        if os.path.exists(metadata_path):
+            logger.info(f"音频片段生成成功，元数据文件: {metadata_path}")
+            return metadata_path
+        else:
+            logger.error("元数据文件不存在")
+            return ""
+    else:
+        logger.error("音频片段生成失败")
+        return ""
+
+def generate_blackboard_video(json_path: str, output_path: str) -> bool:
+    """
+    生成黑板视频
+    
+    Args:
+        json_path: 输入JSON文件路径
+        output_path: 输出视频文件路径
+        
+    Returns:
+        生成是否成功
+    """
+    cmd = [
+        sys.executable,
+        "backend/src/blackboard_video_generator/example.py",
+        json_path,
+        output_path
+    ]
+    
+    if run_command(cmd):
+        if os.path.exists(output_path):
+            logger.info(f"黑板视频生成成功: {output_path}")
+            return True
+        else:
+            logger.error("视频文件不存在")
+            return False
+    else:
+        logger.error("黑板视频生成失败")
+        return False
+
+def compose_video(video_path: str, audio_metadata_path: str, output_path: str) -> bool:
+    """
+    合成视频和音频
+    
+    Args:
+        video_path: 视频文件路径
+        audio_metadata_path: 音频元数据文件路径
+        output_path: 输出文件路径
+        
+    Returns:
+        合成是否成功
+    """
+    try:
+        # 读取音频元数据
+        with open(audio_metadata_path, 'r', encoding='utf-8') as f:
+            audio_segments = json.load(f)
+            
+        if not audio_segments:
+            logger.error("没有音频片段")
+            return False
+            
+        # 创建临时文件用于合成
+        with tempfile.NamedTemporaryFile(suffix='.txt', delete=False) as temp_file:
+            temp_path = temp_file.name
+            
+            # 创建FFmpeg文件列表
+            for segment in audio_segments:
+                audio_path = segment['path']
+                start_time = segment['start_time']
+                temp_file.write(f"file '{os.path.abspath(audio_path)}'\n".encode('utf-8'))
+                
+        # 先合并所有音频片段
+        temp_audio = os.path.join(os.path.dirname(output_path), "temp_audio.wav")
+        concat_cmd = [
+            "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+            "-i", temp_path, 
+            "-c", "copy", 
+            temp_audio
+        ]
+        
+        if not run_command(concat_cmd):
+            logger.error("音频合并失败")
+            return False
+            
+        # 将音频和视频合并
+        output_cmd = [
+            "ffmpeg", "-y",
+            "-i", video_path,
+            "-i", temp_audio,
+            "-c:v", "copy",
+            "-c:a", "aac",
+            "-shortest",
+            output_path
+        ]
+        
+        success = run_command(output_cmd)
+        
+        # 清理临时文件
+        os.unlink(temp_path)
+        if os.path.exists(temp_audio):
+            os.unlink(temp_audio)
+            
+        if success and os.path.exists(output_path):
+            logger.info(f"视频合成成功: {output_path}")
+            return True
+        else:
+            logger.error("视频合成失败")
+            return False
+            
+    except Exception as e:
+        logger.error(f"视频合成异常: {str(e)}")
+        return False
+
+def main(json_path: str, output_dir: str):
+    """
+    主函数
+    
+    Args:
+        json_path: 输入JSON文件路径
+        output_dir: 输出目录
+    """
+    try:
+        # 确保输出目录存在
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # 生成中间文件路径
+        audio_segments_dir = os.path.join(output_dir, "audio_segments")
+        os.makedirs(audio_segments_dir, exist_ok=True)
+        
+        temp_video_path = os.path.join(output_dir, "temp_video.mp4")
+        final_output_path = os.path.join(output_dir, "output.mp4")
+        
+        # 步骤1: 生成音频片段
+        logger.info("步骤1: 生成音频片段")
+        audio_metadata_path = generate_audio_segments(json_path, audio_segments_dir)
+        if not audio_metadata_path:
+            logger.error("音频片段生成失败，终止")
+            return
+            
+        # 步骤2: 生成黑板视频
+        logger.info("步骤2: 生成黑板视频")
+        if not generate_blackboard_video(json_path, temp_video_path):
+            logger.error("黑板视频生成失败，终止")
+            return
+            
+        # 步骤3: 合成视频和音频
+        logger.info("步骤3: 合成视频和音频")
+        if compose_video(temp_video_path, audio_metadata_path, final_output_path):
+            logger.info(f"视频制作完成: {final_output_path}")
+        else:
+            logger.error("视频合成失败")
+            
+        # 清理临时文件
+        if os.path.exists(temp_video_path):
+            os.unlink(temp_video_path)
+            
+    except Exception as e:
+        logger.error(f"视频制作过程中出现错误: {str(e)}")
+
+if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        print("用法: python video_composer.py <输入JSON文件路径>")
+        sys.exit(1)
+        
+    json_path = sys.argv[1]
+    output_dir = "backend/output"
+    
+    main(json_path, output_dir) 

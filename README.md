@@ -1,87 +1,126 @@
-# DogMath - 智能数学题目讲解视频生成系统
+# 数学题视频生成系统
 
-DogMath是一个基于AI的智能数学题目讲解视频生成系统，通过图片输入数学题目，自动生成包含黑板内容、数字人和讲解音频的教学视频。
+这个系统可以根据数学题的JSON格式数据，生成包含黑板视频和语音解说的教学视频。
 
-## 功能特点
+## 系统功能
 
-- 图片输入数学题目
-- AI智能分析题目
-- 自动生成解题步骤
-- 生成教学视频
-- 支持多平台（Web、Android、iOS）
+1. 读取数学题的JSON格式数据
+2. 生成黑板教学视频
+3. 生成语音解说
+4. 将黑板视频和语音解说合成为完整的教学视频
 
-## 技术栈
-
-### 前端
-- React Native
-- Redux Toolkit
-- React Navigation
-- Axios
-- AsyncStorage
-
-### 后端
-- Python FastAPI
-- DeepSeek LLM
-- PostgreSQL
-- Redis
-- RabbitMQ
-- FFmpeg
-
-## 项目结构
+## 目录结构
 
 ```
-DogMath/
-├── frontend/           # React Native前端项目
-├── backend/           # FastAPI后端项目
-├── docs/             # 项目文档
-└── scripts/          # 部署和工具脚本
+.
+├── backend/
+│   ├── data/                # 数据文件
+│   │   └── samples/         # 样本数据
+│   ├── logs/                # 日志文件
+│   ├── output/              # 输出文件
+│   │   └── audio_segments/  # 音频片段
+│   └── src/                 # 源代码
+│       ├── audio_generator/     # 音频生成模块
+│       ├── blackboard_video_generator/  # 黑板视频生成模块
+│       ├── video_composer.py    # 视频合成模块
+│       └── run_pipeline.py      # 流程运行脚本
+└── README.md                # 说明文档
 ```
 
-## 快速开始
+## 使用方法
 
-### 前端开发
+### 前置要求
 
-```bash
-cd frontend
-npm install
-npm start
+1. Python 3.8+
+2. FFmpeg（用于视频合成）
+3. 安装所需的Python包：
+   ```
+   pip install loguru google-cloud-texttospeech opencv-python numpy
+   ```
+
+### 运行流程
+
+使用`run_pipeline.py`脚本来处理一个完整的视频生成流程：
+
+```
+python backend/src/run_pipeline.py <JSON文件路径> [--output_dir <输出目录>]
 ```
 
-### 后端开发
+例如：
 
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# 或
-.\venv\Scripts\activate  # Windows
-pip install -r requirements.txt
-uvicorn src.main:app --reload
+```
+python backend/src/run_pipeline.py backend/data/samples/math_problems/sample_math_problem_011.json
 ```
 
-## 环境要求
+默认情况下，输出文件将保存在`backend/output/`目录中。
 
-- Node.js >= 16
-- Python >= 3.8
-- PostgreSQL >= 13
-- Redis >= 6
-- FFmpeg >= 4.4
+### 单独使用各个模块
 
-## 文档
+如果你想单独使用各个模块：
 
-详细文档请查看 `docs/` 目录：
-- [产品需求文档](docs/PRD.md)
-- [API文档](docs/API.md)
-- [部署文档](docs/DEPLOY.md)
+1. 生成音频片段：
+   ```
+   python backend/src/audio_generator/example.py --segmented <JSON文件路径> <输出目录>
+   ```
 
-## 贡献指南
+2. 生成黑板视频：
+   ```
+   python backend/src/blackboard_video_generator/example.py <JSON文件路径> <输出视频文件路径>
+   ```
 
-1. Fork 项目
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 创建 Pull Request
+3. 合成视频：
+   ```
+   python backend/src/video_composer.py <JSON文件路径>
+   ```
 
-## 许可证
+## JSON数据格式
 
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情 
+系统接受以下格式的JSON数据：
+
+```json
+{
+  "metadata": {
+    "problem_id": "示例ID",
+    "source_image": "图片源文件",
+    "difficulty": "难度级别",
+    "estimated_duration": 120,
+    "knowledge_tags": ["标签1", "标签2"],
+    "created_at": "创建时间"
+  },
+  "blackboard": {
+    "background": "背景类型",
+    "resolution": [1920, 1080],
+    "steps": [
+      {
+        "step_id": 1,
+        "title": "步骤标题",
+        "duration": 15,
+        "elements": [
+          // 各种视觉元素
+        ]
+      }
+    ]
+  },
+  "audio": {
+    "narration": [
+      {
+        "text": "解说文本",
+        "start_time": 0,
+        "end_time": 3,
+        "voice_config": { "speed": 1.0, "pitch": 0 },
+        "ssml": "<speak>SSML格式的解说</speak>"
+      }
+    ],
+    "background_music": "背景音乐设置"
+  }
+}
+```
+
+## 日志
+
+系统日志保存在`backend/logs/`目录中，包括以下日志文件：
+
+- `audio_generator.log` - 音频生成日志
+- `blackboard_video_generator.log` - 黑板视频生成日志
+- `video_composer.log` - 视频合成日志
+- `pipeline.log` - 流程运行日志 

@@ -3,6 +3,7 @@ from pathlib import Path
 from loguru import logger
 import sys
 import os
+import shutil
 
 # 添加项目根目录到系统路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
@@ -45,8 +46,8 @@ def generate_blackboard_video(json_path: str, output_path: str):
         # 保存视频
         logger.info("开始保存视频...")
         if isinstance(video, str):  # 如果返回的是临时文件路径
-            import shutil
-            shutil.copy2(video, output_path)
+            if video != output_path:  # 只有当源文件和目标文件不同时才复制
+                shutil.copy2(video, output_path)
         else:  # 如果返回的是视频对象
             video.release()
             
