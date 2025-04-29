@@ -44,9 +44,12 @@ samples/
 fix_indentation.py
 screenshot_check.png
 
-# 配置文件
-backend/src/audio_generator/config.py
+# 配置文件和API密钥
+backend/src/*/*/config.py
+backend/src/*/config.py
 # 服务账号密钥文件
-backend/src/audio_generator/swift-radar-457602-u4-0ee8fbcefb01.json
-# 通用规则：忽略所有JSON密钥文件
-backend/src/audio_generator/*-*.json 
+backend/src/*/*/*.json
+backend/src/*/*.json
+# 通用规则：忽略所有JSON密钥文件和配置文件
+*/*-*.json
+*config*.py 

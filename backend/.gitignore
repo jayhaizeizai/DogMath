@@ -1,1 +1,44 @@
-# Python\n__pycache__/\n*.py[cod]\n*$py.class\n*.so\n.Python\nbuild/\ndevelop-eggs/\ndist/\ndownloads/\neggs/\n.eggs/\nlib/\nlib64/\nparts/\nsdist/\nvar/\nwheels/\n*.egg-info/\n.installed.cfg\n*.egg\n\n# Logs and output\nlogs/\noutput/\nsamples/\n\n# IDE\n.idea/\n.vscode/\n*.swp\n*.swo\n\n# Other\nfix_indentation.py\nscreenshot_check.png
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Logs and output
+logs/
+output/
+samples/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Other
+fix_indentation.py
+screenshot_check.png
+
+# 配置和密钥文件
+*/*/config.py
+*/*/config_*.py
+*/*/swift-radar-*.json
+*/*/credentials.json
+*/*/*.key
+*/*-*.json

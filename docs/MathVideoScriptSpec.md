@@ -30,8 +30,7 @@ MathVideoScript 由以下四个主要部分组成：
     "steps": []                     // 解题步骤
   },
   "audio": {
-    "narration": [],               // 讲解音频
-    "background_music": "string"    // 背景音乐
+    "narration": []               // 讲解音频
   },
   "annotations": {
     "key_points": []               // 知识点标注
@@ -262,7 +261,6 @@ MathVideoScript 由以下四个主要部分组成：
       "start_time": 0,
       "end_time": 3,
       "voice_config": {
-        "speaker": "teacher_female",
         "speed": 1.0,
         "pitch": 1.0
       },
@@ -271,3 +269,15 @@ MathVideoScript 由以下四个主要部分组成：
   ]
 }
 ```
+
+#### 5.1.1 语音设置说明
+
+- `text`: 朗读文本内容
+- `start_time`: 开始时间（秒）
+- `end_time`: 结束时间（秒）
+- `voice_config`: 语音参数配置
+  - `speed`: 语速，1.0为正常速度
+  - `pitch`: 音调，1.0为正常音调
+- `ssml`: 语音合成标记语言(SSML)格式的文本，支持更丰富的语音表现力
+
+**注意：** 语音合成所使用的具体声音（speaker/voice）不在JSON脚本中指定，而是由系统配置文件(`config.py`)统一控制。这样可以确保所有生成的内容保持声音的一致性，并允许在不修改内容脚本的情况下切换不同的声音。
