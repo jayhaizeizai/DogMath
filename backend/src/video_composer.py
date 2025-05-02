@@ -181,6 +181,114 @@ def compose_video(video_path: str, audio_metadata_path: str, output_path: str) -
         logger.error(f"视频合成异常: {str(e)}")
         return False
 
+def process_teacher_video(json_path: str, output_dir: str) -> bool:
+    """
+    生成教师视频
+    
+    Args:
+        json_path: 输入JSON文件路径
+        output_dir: 输出目录
+        
+    Returns:
+        生成是否成功
+    """
+    try:
+        # 导入teacher_video_generator模块
+        from teacher_video_generator.teacher_video_generator import process_all_audio_files
+        process_all_audio_files()
+        return True
+    except Exception as e:
+        logger.error(f"生成教师视频失败: {str(e)}")
+        return False
+
+def get_timestamp_from_filename(filename: str) -> int:
+    """
+    从文件名中提取时间戳
+    
+    Args:
+        filename: 文件名，格式如 teacher_video_3000_1.mp4
+        
+    Returns:
+        时间戳数值
+    """
+    try:
+        # 从文件名中提取时间戳部分（第一个数字）
+        parts = filename.split('_')
+        if len(parts) >= 4:
+            return int(parts[2])  # 提取3000这样的时间戳
+        return 0
+    except:
+        return 0
+
+def overlay_teacher_video(main_video: str, teacher_videos: List[str], output_path: str) -> bool:
+    """
+    将教师视频叠加到主视频的右下角
+    
+    Args:
+        main_video: 主视频路径
+        teacher_videos: 教师视频路径列表
+        output_path: 输出视频路径
+        
+    Returns:
+        合成是否成功
+    """
+    try:
+        # 确保视频按时间戳排序
+        sorted_videos = sorted(teacher_videos, 
+                             key=lambda x: get_timestamp_from_filename(os.path.basename(x)))
+        logger.info(f"视频合并顺序: {[os.path.basename(v) for v in sorted_videos]}")
+        
+        # 创建临时文件用于存储教师视频列表
+        with tempfile.NamedTemporaryFile(suffix='.txt', delete=False) as temp_file:
+            temp_path = temp_file.name
+            for video in sorted_videos:
+                temp_file.write(f"file '{os.path.abspath(video)}'\n".encode('utf-8'))
+                
+        # 首先合并所有教师视频
+        temp_teacher_video = os.path.join(os.path.dirname(output_path), "temp_teacher.mp4")
+        concat_cmd = [
+            "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+            "-i", temp_path,
+            "-c", "copy",
+            temp_teacher_video
+        ]
+        
+        if not run_command(concat_cmd):
+            logger.error("教师视频合并失败")
+            return False
+
+        # 使用FFmpeg去除绿色背景并叠加视频
+        overlay_cmd = [
+            "ffmpeg", "-y",
+            "-i", main_video,
+            "-i", temp_teacher_video,
+            "-filter_complex",
+            "[1:v]colorkey=0x00FF00:0.3:0.2[ckout];" +  # 去除绿色背景
+            "[0:v][ckout]overlay=main_w-overlay_w-10:main_h-overlay_h-10[out]",  # 放置在右下角，留10像素边距
+            "-map", "[out]",
+            "-map", "0:a",  # 使用主视频的音轨
+            "-c:a", "copy",
+            output_path
+        ]
+        
+        success = run_command(overlay_cmd)
+        
+        # 清理临时文件
+        os.unlink(temp_path)
+        if os.path.exists(temp_teacher_video):
+            os.unlink(temp_teacher_video)
+        
+        if success:
+            logger.info(f"教师视频叠加成功: {output_path}")
+            return True
+        else:
+            logger.error("教师视频叠加失败")
+            return False
+            
+    except Exception as e:
+        logger.error(f"教师视频叠加过程出错: {str(e)}")
+        return False
+
 def main(json_path: str, output_dir: str):
     """
     主函数
@@ -198,6 +306,7 @@ def main(json_path: str, output_dir: str):
         os.makedirs(audio_segments_dir, exist_ok=True)
         
         temp_video_path = os.path.join(output_dir, "temp_video.mp4")
+        temp_with_audio_path = os.path.join(output_dir, "temp_with_audio.mp4")
         final_output_path = os.path.join(output_dir, "output.mp4")
         
         # 步骤1: 生成音频片段
@@ -215,14 +324,41 @@ def main(json_path: str, output_dir: str):
             
         # 步骤3: 合成视频和音频
         logger.info("步骤3: 合成视频和音频")
-        if compose_video(temp_video_path, audio_metadata_path, final_output_path):
+        if not compose_video(temp_video_path, audio_metadata_path, temp_with_audio_path):
+            logger.error("视频音频合成失败，终止")
+            return
+            
+        # 步骤4: 生成教师视频
+        logger.info("步骤4: 生成教师视频")
+        if not process_teacher_video(json_path, output_dir):
+            logger.error("教师视频生成失败，终止")
+            return
+            
+        # 步骤5: 叠加教师视频
+        logger.info("步骤5: 叠加教师视频")
+        teacher_video_dir = os.path.join(output_dir, "teacher_video")
+        teacher_videos = [
+            os.path.join(teacher_video_dir, f) 
+            for f in os.listdir(teacher_video_dir) 
+            if f.startswith("teacher_video_") and f.endswith(".mp4")
+        ]
+        
+        if not teacher_videos:
+            logger.error("未找到教师视频文件")
+            return
+            
+        # 记录找到的视频文件
+        logger.info(f"找到以下教师视频文件: {[os.path.basename(v) for v in teacher_videos]}")
+        
+        if overlay_teacher_video(temp_with_audio_path, teacher_videos, final_output_path):
             logger.info(f"视频制作完成: {final_output_path}")
         else:
-            logger.error("视频合成失败")
+            logger.error("教师视频叠加失败")
             
         # 清理临时文件
-        if os.path.exists(temp_video_path):
-            os.unlink(temp_video_path)
+        for temp_file in [temp_video_path, temp_with_audio_path]:
+            if os.path.exists(temp_file):
+                os.unlink(temp_file)
             
     except Exception as e:
         logger.error(f"视频制作过程中出现错误: {str(e)}")
