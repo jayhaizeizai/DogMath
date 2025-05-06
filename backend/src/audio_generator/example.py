@@ -10,6 +10,8 @@ import json
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from loguru import logger
+import wave
+import shutil
 
 # 添加项目根目录到系统路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
@@ -30,6 +32,13 @@ except ImportError:
 # 配置loguru日志
 log_path = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))) / "logs" / "audio_generator.log"
 logger.add(log_path, rotation="10 MB", retention="1 week", level="DEBUG", encoding="utf-8")
+
+def get_wav_duration(wav_path):
+    """获取wav文件的实际时长（秒）"""
+    with wave.open(wav_path, 'rb') as wf:
+        frames = wf.getnframes()
+        rate = wf.getframerate()
+        return frames / float(rate)
 
 def generate_audio_from_json(json_path: str, output_path: str):
     """
@@ -135,6 +144,11 @@ def generate_segmented_audio(json_path: str, output_dir: str) -> List[Dict[str, 
         包含所有音频片段信息的元数据列表
     """
     try:
+        # 清空输出目录
+        if os.path.exists(output_dir):
+            shutil.rmtree(output_dir)
+        os.makedirs(output_dir, exist_ok=True)
+        
         # 读取JSON数据
         with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -149,9 +163,6 @@ def generate_segmented_audio(json_path: str, output_dir: str) -> List[Dict[str, 
             
         # 创建TTS实例，会自动根据文本语言选择合适的TTS引擎
         tts = LanguageRouterTTS()
-        
-        # 确保输出目录存在
-        os.makedirs(output_dir, exist_ok=True)
         
         # 生成音频片段
         audio_segments = []
@@ -180,15 +191,24 @@ def generate_segmented_audio(json_path: str, output_dir: str) -> List[Dict[str, 
                 voice_name=voice_name
             )
             
+            # 获取实际音频时长
+            actual_duration = get_wav_duration(audio_file)
+            # 计算实际end_time
+            if idx == 0:
+                actual_start_time = 0
+            else:
+                # 上一个片段的end_time
+                actual_start_time = audio_segments[-1]['end_time']
+            actual_end_time = actual_start_time + actual_duration
+
             # 添加到元数据
-            duration = segment.get('end_time', 0) - segment.get('start_time', 0)
             audio_segments.append({
                 'id': idx,
-                'timestamp': timestamp,
+                'timestamp': int(actual_start_time * 1000),
                 'path': audio_file,
-                'duration': duration,
-                'start_time': segment.get('start_time', 0),
-                'end_time': segment.get('end_time', 0)
+                'duration': actual_duration,
+                'start_time': actual_start_time,
+                'end_time': actual_end_time
             })
             
         logger.info(f"音频生成完成：共{len(audio_segments)}个片段")

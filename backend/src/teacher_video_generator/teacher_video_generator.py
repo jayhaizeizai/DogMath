@@ -6,12 +6,13 @@ import os
 import importlib.util
 import sys
 from pathlib import Path
-import binascii  # 新增导入
+import binascii
 from moviepy.editor import VideoFileClip, AudioFileClip
 import logging
 import concurrent.futures
 from datetime import datetime
 import traceback
+import shutil
 
 # 修改配置文件路径读取方式
 script_dir = Path(__file__).parent
@@ -31,11 +32,9 @@ ENDPOINT_ID = config.ENDPOINT_ID
 API_URL = f"https://api.runpod.ai/v2/{ENDPOINT_ID}/run"
 STATUS_URL = f"https://api.runpod.ai/v2/{ENDPOINT_ID}/status/"
 
-# 从配置文件读取路径
-audio_path = config.AUDIO_PATH
-output_path = config.OUTPUT_PATH
-pose_path = getattr(config, 'POSE_PATH', '')
-merge_audio = getattr(config, 'MERGE_AUDIO', True)  # 默认开启音频合成
+# 从配置文件读取其他选项
+POSE_PATH = getattr(config, 'POSE_PATH', '')
+MERGE_AUDIO = getattr(config, 'MERGE_AUDIO', True)  # 默认开启音频合成
 
 # 添加日志配置
 def setup_logging():
@@ -88,104 +87,133 @@ def validate_base64(b64_string):
         print(f"Base64验证错误: {e}")
         return None
 
-def main():
-    # 检查音频文件是否存在
-    if not os.path.exists(audio_path):
-        print(f"错误: 音频文件不存在 - {audio_path}")
-        return
+def generate_teacher_video(audio_path, output_path):
+    """
+    生成教师视频的核心函数，所有参数通过函数参数传递，而不是全局变量
     
-    print(f"正在读取音频文件: {audio_path}")
-    audio_base64 = encode_file(audio_path)
-    
-    # 获取音频时长
-    audio_clip = AudioFileClip(audio_path)
-    audio_duration = audio_clip.duration
-    audio_clip.close()
-    
-    # 获取fps参数
-    fps = getattr(config, 'DEFAULT_FPS', 24)
-    
-    # 根据音频时长和fps计算帧数
-    calculated_length = int(fps * audio_duration)
-    print(f"音频时长: {audio_duration}秒, FPS: {fps}, 计算得出的帧数: {calculated_length}")
-    
-    # 验证音频Base64编码
-    validated_audio = validate_base64(audio_base64)
-    if not validated_audio:
-        print("错误: 音频文件的Base64编码无效")
-        return
-    
-    # 构建基本请求数据
-    input_data = {
-        "audio": validated_audio,
-        "width": getattr(config, 'DEFAULT_WIDTH', 768),
-        "height": getattr(config, 'DEFAULT_HEIGHT', 768),
-        "steps": getattr(config, 'DEFAULT_STEPS', 6),
-        "guidance_scale": getattr(config, 'DEFAULT_GUIDANCE_SCALE', 1.0),
-        "fps": fps,
-        "seed": getattr(config, 'DEFAULT_SEED', 420),
-        "length": calculated_length,  # 使用计算得出的帧数而不是固定值
-        "context_frames": getattr(config, 'DEFAULT_CONTEXT_FRAMES', 12),
-        "context_overlap": getattr(config, 'DEFAULT_CONTEXT_OVERLAP', 3),
-        "sample_rate": getattr(config, 'DEFAULT_SAMPLE_RATE', 16000),
-        "start_idx": getattr(config, 'DEFAULT_START_IDX', 0)
-    }
-    
-    # 处理姿势数据（如果提供）
-    if pose_path and os.path.exists(pose_path):
-        print(f"正在处理姿势数据: {pose_path}")
-        if os.path.isdir(pose_path):
-            # 如果是目录，通知用户我们将使用目录
-            print(f"将使用姿势数据目录: {pose_path}")
-            input_data["pose"] = pose_path
-        else:
-            # 如果是文件（假设是zip），编码为base64
-            print(f"将姿势数据文件进行base64编码: {pose_path}")
-            pose_b64 = encode_file(pose_path)
-            validated_pose = validate_base64(pose_b64)
-            if not validated_pose:
-                print("错误: 姿势数据的Base64编码无效")
-                return
-            input_data["pose"] = validated_pose
-            print("姿势数据编码完成")
-    
-    payload = {
-        "input": input_data
-    }
-    
-    # 发送请求
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
-    print("正在发送请求到RunPod API...")
-    try:
-        response = requests.post(API_URL, headers=headers, json=payload)
-        response.raise_for_status()  # 检查HTTP错误
-        data = response.json()
+    Args:
+        audio_path: 输入音频文件路径
+        output_path: 输出视频文件路径
         
-        # 检查是否是异步作业
-        if "id" in data:
-            job_id = data["id"]
-            print(f"已成功提交异步作业，ID: {job_id}")
-            process_async_job(job_id, headers)
-        else:
-            # 同步作业，直接处理结果
-            process_result(data)
+    Returns:
+        生成是否成功
+    """
+    try:
+        # 检查音频文件是否存在
+        if not os.path.exists(audio_path):
+            logging.error(f"错误: 音频文件不存在 - {audio_path}")
+            return False
+        
+        logging.info(f"正在读取音频文件: {audio_path}")
+        audio_base64 = encode_file(audio_path)
+        
+        # 获取音频时长
+        audio_clip = AudioFileClip(audio_path)
+        audio_duration = audio_clip.duration
+        audio_clip.close()
+        
+        # 获取fps参数
+        fps = getattr(config, 'DEFAULT_FPS', 24)
+        
+        # 根据音频时长和fps计算帧数
+        calculated_length = int(fps * audio_duration)
+        logging.info(f"音频时长: {audio_duration}秒, FPS: {fps}, 计算得出的帧数: {calculated_length}")
+        
+        # 验证音频Base64编码
+        validated_audio = validate_base64(audio_base64)
+        if not validated_audio:
+            logging.error("错误: 音频文件的Base64编码无效")
+            return False
+        
+        # 构建基本请求数据
+        input_data = {
+            "audio": validated_audio,
+            "width": getattr(config, 'DEFAULT_WIDTH', 768),
+            "height": getattr(config, 'DEFAULT_HEIGHT', 768),
+            "steps": getattr(config, 'DEFAULT_STEPS', 6),
+            "guidance_scale": getattr(config, 'DEFAULT_GUIDANCE_SCALE', 1.0),
+            "fps": fps,
+            "seed": getattr(config, 'DEFAULT_SEED', 420),
+            "length": calculated_length,  # 使用计算得出的帧数而不是固定值
+            "context_frames": getattr(config, 'DEFAULT_CONTEXT_FRAMES', 12),
+            "context_overlap": getattr(config, 'DEFAULT_CONTEXT_OVERLAP', 3),
+            "sample_rate": getattr(config, 'DEFAULT_SAMPLE_RATE', 16000),
+            "start_idx": getattr(config, 'DEFAULT_START_IDX', 0)
+        }
+        
+        # 处理姿势数据（如果提供）
+        if POSE_PATH and os.path.exists(POSE_PATH):
+            logging.info(f"正在处理姿势数据: {POSE_PATH}")
+            if os.path.isdir(POSE_PATH):
+                # 如果是目录，通知用户我们将使用目录
+                logging.info(f"将使用姿势数据目录: {POSE_PATH}")
+                input_data["pose"] = POSE_PATH
+            else:
+                # 如果是文件（假设是zip），编码为base64
+                logging.info(f"将姿势数据文件进行base64编码: {POSE_PATH}")
+                pose_b64 = encode_file(POSE_PATH)
+                validated_pose = validate_base64(pose_b64)
+                if not validated_pose:
+                    logging.error("错误: 姿势数据的Base64编码无效")
+                    return False
+                input_data["pose"] = validated_pose
+                logging.info("姿势数据编码完成")
+        
+        payload = {
+            "input": input_data
+        }
+        
+        # 发送请求
+        headers = {
+            "Authorization": f"Bearer {API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        logging.info("正在发送请求到RunPod API...")
+        try:
+            response = requests.post(API_URL, headers=headers, json=payload)
+            response.raise_for_status()  # 检查HTTP错误
+            data = response.json()
             
-    except requests.exceptions.RequestException as e:
-        print(f"API请求错误: {e}")
-    except json.JSONDecodeError:
-        print(f"无效的JSON响应: {response.text}")
+            # 检查是否是异步作业
+            if "id" in data:
+                job_id = data["id"]
+                logging.info(f"已成功提交异步作业，ID: {job_id}")
+                return process_async_job(job_id, headers, output_path, audio_path)
+            else:
+                # 同步作业，直接处理结果
+                return process_result(data, output_path, audio_path)
+                
+        except requests.exceptions.RequestException as e:
+            logging.error(f"API请求错误: {e}")
+            return False
+        except json.JSONDecodeError:
+            logging.error(f"无效的JSON响应: {response.text}")
+            return False
+        except Exception as e:
+            logging.error(f"发生错误: {e}")
+            return False
+            
     except Exception as e:
-        print(f"发生错误: {e}")
+        logging.error(f"生成教师视频异常: {e}")
+        return False
 
-def process_async_job(job_id, headers):
-    """轮询异步作业状态并处理结果"""
+def process_async_job(job_id, headers, output_path, audio_path):
+    """
+    轮询异步作业状态并处理结果
+    
+    Args:
+        job_id: 异步作业ID
+        headers: HTTP请求头
+        output_path: 输出视频路径
+        audio_path: 输入音频路径
+        
+    Returns:
+        处理是否成功
+    """
     status_url = STATUS_URL + job_id
     
-    print("等待作业完成...")
+    logging.info("等待作业完成...")
     while True:
         try:
             response = requests.get(status_url, headers=headers)
@@ -193,29 +221,40 @@ def process_async_job(job_id, headers):
             status_data = response.json()
             
             status = status_data.get("status")
-            print(f"作业状态: {status}")
+            logging.info(f"作业状态: {status}")
             
             if status == "COMPLETED":
-                print("作业已完成!")
-                process_result(status_data)
-                break
+                logging.info("作业已完成!")
+                return process_result(status_data, output_path, audio_path)
             elif status == "FAILED":
-                print(f"作业失败: {status_data.get('error', '未知错误')}")
-                break
+                logging.error(f"作业失败: {status_data.get('error', '未知错误')}")
+                return False
             elif status == "CANCELLED":
-                print("作业已取消")
-                break
+                logging.error("作业已取消")
+                return False
             
             # 等待10秒后再次轮询
-            print("等待10秒...")
+            logging.info("等待10秒...")
             time.sleep(10)
             
         except Exception as e:
-            print(f"轮询状态时发生错误: {e}")
+            logging.error(f"轮询状态时发生错误: {e}")
             time.sleep(10)  # 出错后继续尝试
+    
+    return False
 
-def process_result(data):
-    """处理API返回的结果"""
+def process_result(data, output_path, audio_path):
+    """
+    处理API返回的结果
+    
+    Args:
+        data: API返回的数据
+        output_path: 输出视频路径
+        audio_path: 输入音频路径
+        
+    Returns:
+        处理是否成功
+    """
     try:
         # 保存原始响应到日志目录
         log_dir = Path("backend/logs/teacher_video_generator")
@@ -227,7 +266,7 @@ def process_result(data):
         response_data = data
         if isinstance(response_data, dict) and "output" in response_data:
             response_data = response_data["output"]
-            # 处理第二层嵌套 - 这是新增的处理
+            # 处理第二层嵌套
             if isinstance(response_data, dict) and "output" in response_data:
                 response_data = response_data["output"]
         
@@ -255,12 +294,12 @@ def process_result(data):
                     output_dir.mkdir(parents=True, exist_ok=True)
                     
                     # 如果不需要合成音频，直接保存为最终视频
-                    if not merge_audio:
+                    if not MERGE_AUDIO:
                         logging.info("跳过音频合成，直接保存无声视频")
                         with open(output_path, "wb") as f:
                             f.write(video_data)
                         logging.info(f"视频已保存到: {output_path}")
-                        return
+                        return True
                     
                     # 如果需要合成音频，保存临时无声视频
                     silent_video_path = output_path.replace('.mp4', '_silent.mp4')
@@ -292,6 +331,7 @@ def process_result(data):
                             os.remove(silent_video_path)
                         
                         logging.info(f"添加音频后的视频保存到: {output_path}")
+                        return True
                     except Exception as e:
                         logging.error(f"添加音频时出错: {e}")
                         logging.error("保留无声视频文件")
@@ -299,21 +339,26 @@ def process_result(data):
                         if not os.path.exists(output_path):
                             os.rename(silent_video_path, output_path)
                             logging.info(f"无声视频重命名为: {output_path}")
+                        return False
                     
                 except binascii.Error as e:
                     logging.error(f"Base64解码错误: {e}")
                     with open("invalid_base64.txt", "w") as f:
                         f.write(video_base64[:1000])
+                    return False
                         
             else:
-                print(f"错误: video字段类型应为字符串，实际为{type(video_base64)}")
+                logging.error(f"错误: video字段类型应为字符串，实际为{type(video_base64)}")
+                return False
         else:
-            print("错误: 响应中未找到有效的video字段")
-            print(f"可用字段: {list(response_data.keys()) if isinstance(response_data, dict) else '非字典响应'}")
+            logging.error("错误: 响应中未找到有效的video字段")
+            logging.error(f"可用字段: {list(response_data.keys()) if isinstance(response_data, dict) else '非字典响应'}")
+            return False
             
     except Exception as e:
-        print(f"处理响应时出错: {e}")
+        logging.error(f"处理响应时出错: {e}")
         logging.error(traceback.format_exc())
+        return False
 
 def process_single_audio(audio_file):
     """处理单个音频文件"""
@@ -327,26 +372,24 @@ def process_single_audio(audio_file):
         output_dir = project_root / "backend/output/teacher_video"
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        # 更新输出路径（使用绝对路径）
-        global output_path
-        output_path = str(output_dir / video_name)
-        
-        # 更新音频路径（使用绝对路径）
-        global audio_path
-        audio_path = str(audio_file)
+        # 计算实际的输入和输出路径
+        actual_audio_path = str(audio_file)
+        actual_output_path = str(output_dir / video_name)
         
         logging.info(f"开始处理音频: {audio_file.name}")
-        logging.info(f"输出视频将保存到: {output_path}")
+        logging.info(f"输出视频将保存到: {actual_output_path}")
         start_time = time.time()
         
-        main()  # 调用原有的main函数处理单个文件
+        # 调用核心函数处理单个文件，直接传递路径参数
+        success = generate_teacher_video(actual_audio_path, actual_output_path)
         
         # 验证文件是否成功保存
-        if os.path.exists(output_path):
-            file_size = os.path.getsize(output_path)
-            logging.info(f"视频文件已保存: {output_path} (大小: {file_size/1024/1024:.2f}MB)")
+        if success and os.path.exists(actual_output_path):
+            file_size = os.path.getsize(actual_output_path)
+            logging.info(f"视频文件已保存: {actual_output_path} (大小: {file_size/1024/1024:.2f}MB)")
         else:
-            logging.error(f"视频文件未能成功保存: {output_path}")
+            logging.error(f"视频文件未能成功保存: {actual_output_path}")
+            return False
         
         end_time = time.time()
         processing_time = end_time - start_time
@@ -355,7 +398,7 @@ def process_single_audio(audio_file):
         return True
     except Exception as e:
         logging.error(f"处理 {audio_file.name} 时出错: {e}")
-        logging.error(traceback.format_exc())  # 添加详细的错误跟踪
+        logging.error(traceback.format_exc())
         return False
 
 def process_all_audio_files():
@@ -371,11 +414,17 @@ def process_all_audio_files():
         logging.error(f"在 {audio_dir} 中未找到音频文件")
         return
     
+    # 清空输出目录
+    output_dir = Path("backend/output/teacher_video")
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
     total_start_time = time.time()
     logging.info(f"开始处理 {len(audio_files)} 个音频文件")
     
-    # 使用线程池并发处理，最多3个并发
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+    # 使用线程池并发处理，最多5个并发
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         futures = [executor.submit(process_single_audio, audio_file) 
                   for audio_file in audio_files]
         

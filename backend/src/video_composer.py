@@ -289,6 +289,103 @@ def overlay_teacher_video(main_video: str, teacher_videos: List[str], output_pat
         logger.error(f"教师视频叠加过程出错: {str(e)}")
         return False
 
+def generate_subtitle_file(json_path: str, audio_metadata_path: str, output_path: str) -> bool:
+    """
+    从JSON文件和音频元数据生成SRT字幕文件
+    
+    Args:
+        json_path: 输入JSON文件路径
+        audio_metadata_path: 音频元数据文件路径
+        output_path: 输出SRT文件路径
+        
+    Returns:
+        生成是否成功
+    """
+    try:
+        # 读取JSON文件获取字幕文本
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            
+        narrations = data.get('audio', {}).get('narration', [])
+        if not narrations:
+            logger.error("未找到字幕内容")
+            return False
+            
+        # 读取音频元数据获取准确的时间信息
+        with open(audio_metadata_path, 'r', encoding='utf-8') as f:
+            audio_segments = json.load(f)
+            
+        if not audio_segments:
+            logger.error("未找到音频元数据")
+            return False
+            
+        # 生成SRT格式字幕
+        with open(output_path, 'w', encoding='utf-8') as f:
+            for i, segment in enumerate(audio_segments, 1):
+                # 从音频元数据中获取准确的时间
+                start_time = segment['start_time']
+                end_time = segment['end_time']
+                
+                # 从narrations中获取对应的文本
+                text = narrations[i-1]['text'] if i-1 < len(narrations) else ""
+                
+                # 转换时间格式为 HH:MM:SS,mmm
+                start_formatted = '{:02d}:{:02d}:{:02d},000'.format(
+                    int(start_time) // 3600,
+                    (int(start_time) % 3600) // 60,
+                    int(start_time) % 60
+                )
+                end_formatted = '{:02d}:{:02d}:{:02d},000'.format(
+                    int(end_time) // 3600,
+                    (int(end_time) % 3600) // 60,
+                    int(end_time) % 60
+                )
+                
+                # 写入SRT格式
+                f.write(f"{i}\n")
+                f.write(f"{start_formatted} --> {end_formatted}\n")
+                f.write(f"{text}\n\n")
+                
+        logger.info(f"字幕文件生成成功: {output_path}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"生成字幕文件失败: {str(e)}")
+        return False
+
+def add_subtitle_to_video(video_path: str, subtitle_path: str, output_path: str) -> bool:
+    """
+    将字幕添加到视频中
+    
+    Args:
+        video_path: 输入视频路径
+        subtitle_path: 字幕文件路径
+        output_path: 输出视频路径
+        
+    Returns:
+        添加是否成功
+    """
+    try:
+        # 使用FFmpeg添加字幕
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", video_path,
+            "-vf", f"subtitles={subtitle_path}:force_style='Fontsize=24,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BorderStyle=3'",
+            "-c:a", "copy",
+            output_path
+        ]
+        
+        if run_command(cmd):
+            logger.info(f"字幕添加成功: {output_path}")
+            return True
+        else:
+            logger.error("字幕添加失败")
+            return False
+            
+    except Exception as e:
+        logger.error(f"添加字幕过程出错: {str(e)}")
+        return False
+
 def main(json_path: str, output_dir: str):
     """
     主函数
@@ -329,10 +426,10 @@ def main(json_path: str, output_dir: str):
             return
             
         # 步骤4: 生成教师视频
-        logger.info("步骤4: 生成教师视频")
-        if not process_teacher_video(json_path, output_dir):
-            logger.error("教师视频生成失败，终止")
-            return
+        #logger.info("步骤4: 生成教师视频")
+        #if not process_teacher_video(json_path, output_dir):
+        #    logger.error("教师视频生成失败，终止")
+        #    return
             
         # 步骤5: 叠加教师视频
         logger.info("步骤5: 叠加教师视频")
@@ -342,21 +439,47 @@ def main(json_path: str, output_dir: str):
             for f in os.listdir(teacher_video_dir) 
             if f.startswith("teacher_video_") and f.endswith(".mp4")
         ]
-        
+
         if not teacher_videos:
             logger.error("未找到教师视频文件")
             return
             
         # 记录找到的视频文件
         logger.info(f"找到以下教师视频文件: {[os.path.basename(v) for v in teacher_videos]}")
-        
+
         if overlay_teacher_video(temp_with_audio_path, teacher_videos, final_output_path):
             logger.info(f"视频制作完成: {final_output_path}")
         else:
             logger.error("教师视频叠加失败")
             
+        # 步骤6: 生成字幕文件
+        logger.info("步骤6: 生成字幕文件")
+        subtitle_path = os.path.join(output_dir, "subtitle.srt")
+        audio_metadata_path = os.path.join(output_dir, "audio_segments", "audio_metadata.json")
+        
+        if not os.path.exists(audio_metadata_path):
+            logger.error("音频元数据文件不存在")
+            return
+            
+        if not generate_subtitle_file(json_path, audio_metadata_path, subtitle_path):
+            logger.error("字幕文件生成失败")
+            return
+            
+        # 步骤7: 添加字幕
+        logger.info("步骤7: 添加字幕")
+        temp_final_path = os.path.join(output_dir, "temp_final.mp4")
+        os.rename(final_output_path, temp_final_path)
+        
+        if add_subtitle_to_video(temp_final_path, subtitle_path, final_output_path):
+            logger.info(f"视频制作完成: {final_output_path}")
+        else:
+            logger.error("字幕添加失败")
+            # 如果添加字幕失败，至少保留原始视频
+            if os.path.exists(temp_final_path):
+                os.rename(temp_final_path, final_output_path)
+            
         # 清理临时文件
-        for temp_file in [temp_video_path, temp_with_audio_path]:
+        for temp_file in [temp_video_path, temp_with_audio_path, temp_final_path, subtitle_path]:
             if os.path.exists(temp_file):
                 os.unlink(temp_file)
             
