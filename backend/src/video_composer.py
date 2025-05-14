@@ -257,16 +257,21 @@ def overlay_teacher_video(main_video: str, teacher_videos: List[str], output_pat
             logger.error("教师视频合并失败")
             return False
 
-        # 使用FFmpeg去除绿色背景并叠加视频
+        # 使用FFmpeg去除蓝色背景并叠加视频
         overlay_cmd = [
             "ffmpeg", "-y",
             "-i", main_video,
             "-i", temp_teacher_video,
             "-filter_complex",
-            "[1:v]colorkey=0x00FF00:0.3:0.2[ckout];" +  # 去除绿色背景
-            "[0:v][ckout]overlay=main_w-overlay_w-10:main_h-overlay_h-10[out]",  # 放置在右下角，留10像素边距
+            "[1:v]format=rgb24,"          # 统一色彩空间，避免采样误差
+            "colorkey=0x0D47A1:0.06:0.05,"# similarity=0.06  blend=0.05
+            "premultiply,boxblur=2,unpremultiply"  # 羽化 2px
+            "[fg];"
+            "[0:v][fg]overlay=main_w-overlay_w-10:main_h-overlay_h-10[out]",
             "-map", "[out]",
-            "-map", "0:a",  # 使用主视频的音轨
+            "-map", "0:a?",               # ⬅ 如果 main 视频可能没音轨，加 ? 避免报错
+            "-c:v", "libx264",            # 显式指定编码器
+            "-pix_fmt", "yuv420p",        # 保证兼容性
             "-c:a", "copy",
             output_path
         ]
@@ -428,8 +433,8 @@ def main(json_path: str, output_dir: str):
         # 步骤4: 生成教师视频
         #logger.info("步骤4: 生成教师视频")
         #if not process_teacher_video(json_path, output_dir):
-        #    logger.error("教师视频生成失败，终止")
-        #    return
+        #   logger.error("教师视频生成失败，终止")
+        #   return
             
         # 步骤5: 叠加教师视频
         logger.info("步骤5: 叠加教师视频")
