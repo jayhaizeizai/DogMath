@@ -263,17 +263,22 @@ def overlay_teacher_video(main_video: str, teacher_videos: List[str], output_pat
             "-i", main_video,
             "-i", temp_teacher_video,
             "-filter_complex",
-            "[1:v]format=rgb24,"          # 统一色彩空间，避免采样误差
-            "colorkey=0x0D47A1:0.06:0.05,"# similarity=0.06  blend=0.05
-            "premultiply,boxblur=2,unpremultiply"  # 羽化 2px
-            "[fg];"
-            "[0:v][fg]overlay=main_w-overlay_w-10:main_h-overlay_h-10[out]",
+            (
+                "[1:v]format=rgba,"
+                "colorkey=0x0D47A1:0.05:0.05,"
+                "boxblur=0:0:0:0:2:1,"
+                "colorbalance=bs=0.10:bh=-0.05,"
+                "unsharp=5:5:1.0:5:5:0.0[fg];"
+                "[0:v][fg]overlay=main_w-overlay_w-10:main_h-overlay_h-10[out]"
+            ),
             "-map", "[out]",
-            "-map", "0:a?",               # ⬅ 如果 main 视频可能没音轨，加 ? 避免报错
-            "-c:v", "libx264",            # 显式指定编码器
-            "-pix_fmt", "yuv420p",        # 保证兼容性
+            "-map", "0:a?",
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            "-crf", "20",
+            "-preset", "medium",
             "-c:a", "copy",
-            output_path
+            output_path,
         ]
         
         success = run_command(overlay_cmd)
