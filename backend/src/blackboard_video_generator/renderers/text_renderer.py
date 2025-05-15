@@ -23,18 +23,14 @@ def render_text_as_image(text, font_size, debug=False):
     try:
         logger.info(f"渲染文本: {text}, 字体大小: {font_size}")
         
-        # 动态计算画布大小
-        text_length = len(text)
-        # 中文字符通常需要更多空间
-        has_chinese = any('\u4e00' <= c <= '\u9fff' for c in text)
-        width_factor = 0.4 if has_chinese else 0.25
-        # 根据文本长度和字体大小动态计算宽度
-        fig_width = min(max(text_length * width_factor, 2), 10)
-        # 根据字体大小调整高度
-        fig_height = min(max(font_size / 40, 1), 3)
+        # 新的画布尺寸计算
+        dpi = 200  # 保持高清
+        char_w_inch = font_size * 0.55 / 72  # 每个字符宽度（英寸）
+        fig_width = max(char_w_inch * len(text), 2)  # 最小2英寸
+        fig_height = max(font_size * 1.3 / 72, 1)    # 字体高度加行距
         
         # 创建matplotlib图形，使用动态大小
-        fig = plt.figure(figsize=(fig_width, fig_height), dpi=200, facecolor='none')
+        fig = plt.figure(figsize=(fig_width, fig_height), dpi=dpi, facecolor='none')
         ax = fig.add_subplot(111)
         
         # 设置背景完全透明
@@ -44,7 +40,7 @@ def render_text_as_image(text, font_size, debug=False):
         
         # 尝试检测可用的中文字体
         chinese_font = None
-        if has_chinese:
+        if any('\u4e00' <= c <= '\u9fff' for c in text):
             try:
                 from matplotlib.font_manager import fontManager
                 font_priorities = [
@@ -72,22 +68,20 @@ def render_text_as_image(text, font_size, debug=False):
         # 渲染文本
         if chinese_font:
             ax.text(0.5, 0.5, text, 
-                   fontsize=font_size*0.8,  # 调整字体大小
+                   fontsize=font_size,  # 移除了 * 0.8
                    color='white',
-                   horizontalalignment='center',
-                   verticalalignment='center',
+                   ha='center', va='center',
                    transform=ax.transAxes,
                    family=chinese_font)
         else:
             # 如果没有找到合适的中文字体，尝试用sans-serif字体族
             ax.text(0.5, 0.5, text, 
-                   fontsize=font_size*0.8,  # 调整字体大小
+                   fontsize=font_size,  # 移除了 * 0.8
                    color='white',
-                   horizontalalignment='center',
-                   verticalalignment='center',
+                   ha='center', va='center',
                    transform=ax.transAxes,
                    family='sans-serif')
-            if debug and has_chinese:
+            if debug and any('\u4e00' <= c <= '\u9fff' for c in text):
                 logger.warning("未找到中文字体，使用sans-serif族")
         
         # 移除坐标轴和边框
@@ -96,7 +90,7 @@ def render_text_as_image(text, font_size, debug=False):
             spine.set_visible(False)
         
         # 调整边距
-        plt.tight_layout(pad=0.5)
+        plt.tight_layout(pad=0)
         
         # 将图形转换为图像
         buf = io.BytesIO()
@@ -152,8 +146,8 @@ def render_text(text, font_size, debug=False):
     img = render_text_as_image(text, font_size, debug)
     
     # 检查是否需要缩放图像
-    max_width = 800  # 最大宽度
-    max_height = 600  # 最大高度
+    max_width = 1920  # 最大宽度
+    max_height = 1080  # 最大高度
     
     h, w = img.shape[:2]
     if debug:

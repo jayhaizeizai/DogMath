@@ -112,8 +112,8 @@ def render_latex_as_image(latex, font_size=24, skip_scaling=False, debug=False):
             
             # 检查是否需要缩放图像
             if not skip_scaling:  # 添加此条件
-                max_width = 800  # 最大宽度
-                max_height = 600  # 最大高度
+                max_width = 1920  # 最大宽度
+                max_height = 1080  # 最大高度
                 
                 h, w = canvas.shape[:2]
                 logger.debug(f"LaTeX公式原始图像大小: {w}x{h}")
@@ -201,8 +201,8 @@ def render_formula(formula, font_size, debug=False):
                 logger.debug(f"放置图像部分，当前x_offset: {x_offset}")
             
             # 检查是否需要缩放最终图像
-            max_width = 800
-            max_img_height = 600
+            max_width = 1920
+            max_img_height = 1080
             
             h, w = combined_img.shape[:2]
             if debug:
