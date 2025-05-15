@@ -116,6 +116,10 @@ def render_text_as_image(text, font_size, debug=False):
             '℃':  r'$^\circ\mathrm{C}$',     # 摄氏度
             '′':  r'$^\prime$',               # 分
             '″':  r'$^{\prime\prime}$',      # 秒
+
+            # 添加平方符号的替换规则
+            '²': r'$^2$',
+            '³': r'$^3$',
         }
         
         # 替换所有数学符号
