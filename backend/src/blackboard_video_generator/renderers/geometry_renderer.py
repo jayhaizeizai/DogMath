@@ -31,15 +31,35 @@ def parse_svg_path(svg_path: str) -> List[Dict[str, Any]]:
         pattern = r'([MLZAamlz])([^MLZAamlz]*)'
         commands = []
         
-        # 检测是否是圆形路径
-        is_circle = "a 40 40 0 1 0 80 0 a 40 40 0 1 0 -80 0" in svg_path
+        # ---------- 改动①：允许 dx = 2r，匹配更宽松 ----------
+        circle_re = re.compile(r'''
+            M\s+([\d.]+)\s+([\d.]+)          # M  cx cy
+            \s+m\s+-([\d.]+)\s+0             # m -r 0
+            \s+a\s+\3\s+\3\s+0\s+1\s+[01]\s+([\d.]+)\s+0   # dx = ? 0
+            \s+a\s+\3\s+\3\s+0\s+1\s+[01]\s+-\4\s+0        # dx = -?
+        ''', re.I | re.X)
+
+        m_circle = circle_re.search(svg_path)
+        is_circle = False
+        if m_circle:
+            r  = float(m_circle.group(3))
+            dx = abs(float(m_circle.group(4)))
+            # 允许少量误差，确认 dx ≈ 2r 才认为是完整圆
+            if abs(dx - 2*r) < 1e-3:
+                is_circle = True
         
         # 如果是完整圆，直接使用参数方程生成更平滑的圆
         if is_circle:
             logger.info("检测到完整圆形路径，使用参数方程生成")
-            # 假设圆心在(50,50)，半径为40
-            center_x, center_y = 50, 50
-            radius = 40
+            
+            # 改动②：若正则命中，读取圆心与半径；否则沿用旧默认值
+            if m_circle:
+                center_x = float(m_circle.group(1))
+                center_y = float(m_circle.group(2))
+                radius   = float(m_circle.group(3))
+            else:
+                center_x, center_y, radius = 50, 50, 40
+                
             # 生成24个点的平滑圆
             num_points = 24
             
@@ -130,9 +150,11 @@ def parse_svg_path(svg_path: str) -> List[Dict[str, Any]]:
                         x += current_pos[0]
                         y += current_pos[1]
                     
-                    # 简化：使用多个点近似圆弧
-                    # 创建8-12个中间点来近似圆弧
-                    num_segments = 12
+                    # 改动③：根据弧长自动确定分段数，弧越大点越多
+                    est_len = 2 * math.pi * max(rx, ry) * abs(1 if large_arc_flag else 0.5)
+                    seg_len = 6        # 目标每段≈6px，可自行调
+                    num_segments = max(8, int(est_len / seg_len))
+                    
                     logger.info(f"将弧形分为{num_segments}段，从({current_pos[0]}, {current_pos[1]})到({x}, {y})")
                     
                     # 计算起点和终点之间的直线距离
@@ -335,6 +357,11 @@ def transform_commands(commands: List[Dict[str, Any]], scale: float, offset_x: f
             transformed.append({'command': 'Z'})
     return transformed
 
+def polar_to_cart(cx: float, cy: float, r: float, angle_deg: float):
+    """极坐标转笛卡尔坐标"""
+    rad = math.radians(angle_deg)
+    return cx + r * math.cos(rad), cy + r * math.sin(rad)
+
 def render_geometry(geometry_data: Dict[str, Any], progress: float = 1.0, scale_factor: float = 1.0, debug: bool = False) -> np.ndarray:
     """渲染几何图形"""
     try:
@@ -421,7 +448,7 @@ def render_geometry(geometry_data: Dict[str, Any], progress: float = 1.0, scale_
                     elif debug:
                         logger.warning(f"线段{i}数据结构异常: {item}")
             else:
-                # 原有的单个形状处理（如圆）
+                # 原有的单个形状处理
                 if isinstance(shape_data, dict) and 'path' in shape_data:
                     path_str = shape_data['path']
                     if debug:
@@ -446,6 +473,81 @@ def render_geometry(geometry_data: Dict[str, Any], progress: float = 1.0, scale_
                                     max(combined_bbox[2], bbox[2]),
                                     max(combined_bbox[3], bbox[3])
                                 )
+                # ---------- 新增：兼容 {type:"circle", cx, cy, r} ----------
+                elif isinstance(shape_data, dict) and shape_data.get('type') == 'circle':
+                    cx = shape_data['cx']
+                    cy = shape_data['cy']
+                    r  = shape_data['r']
+                    # 转成"双弧"完整圆路径
+                    path_str = (
+                        f"M {cx} {cy} m -{r} 0 "        # 起点在圆左端
+                        f"a {r} {r} 0 1 0 {2*r} 0 "     # 第一段弧
+                        f"a {r} {r} 0 1 0 {-2*r} 0"     # 第二段弧
+                    )
+                    commands = parse_svg_path(path_str)
+                    if commands:
+                        shapes_commands[shape_name] = commands
+                        bbox = calculate_bbox(commands)
+                        if combined_bbox is None:
+                            combined_bbox = bbox
+                        else:
+                            combined_bbox = (
+                                min(combined_bbox[0], bbox[0]),
+                                min(combined_bbox[1], bbox[1]),
+                                max(combined_bbox[2], bbox[2]),
+                                max(combined_bbox[3], bbox[3])
+                            )
+                # ---------- 椭圆 ellipse ----------
+                elif isinstance(shape_data, dict) and shape_data.get('type') == 'ellipse':
+                    cx = shape_data['cx'];  cy  = shape_data['cy']
+                    rx = shape_data['rx'];  ry  = shape_data['ry']
+                    # 双弧完整椭圆：a rx ry …
+                    path_str = (
+                        f"M {cx} {cy} m -{rx} 0 "
+                        f"a {rx} {ry} 0 1 0 {2*rx} 0 "
+                        f"a {rx} {ry} 0 1 0 {-2*rx} 0"
+                    )
+                    commands = parse_svg_path(path_str)
+                    if commands:
+                        shapes_commands[shape_name] = commands
+                        bbox = calculate_bbox(commands)
+                        if combined_bbox is None: combined_bbox = bbox
+                        else:
+                            combined_bbox = (min(combined_bbox[0], bbox[0]),
+                                             min(combined_bbox[1], bbox[1]),
+                                             max(combined_bbox[2], bbox[2]),
+                                             max(combined_bbox[3], bbox[3]))
+                # ---------- 扇形/圆弧 sector | arc ----------
+                elif isinstance(shape_data, dict) and shape_data.get('type') in ('sector', 'arc'):
+                    cx = shape_data['cx']; cy = shape_data['cy']; r = shape_data['r']
+                    θ0 = shape_data['startAngle']   # 单位：度
+                    θ1 = shape_data['endAngle']     # 逆时针为正，保持与常规数学方向一致
+                    # 起止点
+                    x0, y0 = polar_to_cart(cx, cy, r, θ0)
+                    x1, y1 = polar_to_cart(cx, cy, r, θ1)
+                    # 角差与 SVG 标志
+                    dθ = (θ1 - θ0) % 360
+                    large_arc_flag = 1 if dθ > 180 else 0
+                    sweep_flag     = 1  # 逆时针
+                    arc_cmd = f"A {r} {r} 0 {large_arc_flag} {sweep_flag} {x1} {y1}"
+                    if shape_data['type'] == 'sector':
+                        # M->L 起点, 弧, L->中心, Z 闭合
+                        path_str = f"M {cx} {cy} L {x0} {y0} {arc_cmd} Z"
+                    else:  # 纯圆弧
+                        path_str = f"M {x0} {y0} {arc_cmd}"
+                    commands = parse_svg_path(path_str)
+                    if commands:
+                        shapes_commands[shape_name] = commands
+                        bbox = calculate_bbox(commands)
+                        if combined_bbox is None: combined_bbox = bbox
+                        else:
+                            combined_bbox = (min(combined_bbox[0], bbox[0]),
+                                             min(combined_bbox[1], bbox[1]),
+                                             max(combined_bbox[2], bbox[2]),
+                                             max(combined_bbox[3], bbox[3]))
+                else:
+                    if debug:
+                        logger.warning(f"形状 {shape_name} 数据结构异常: {shape_data}")
         
         # 处理标签 (在图像上渲染)
         label_images = []
