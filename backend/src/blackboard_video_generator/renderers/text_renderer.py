@@ -8,6 +8,22 @@ from ..utils.image_utils import trim_image
 
 logger = logging.getLogger(__name__)
 
+# --- 仅用于普通 text 的 Unicode 符号 ---------------------------
+UNICODE_REPLACEMENTS = {
+    '⊥': '⊥',
+    '∠': '∠',
+    '∥': '∥',
+    '⊙': '⊙',
+    '△': '△',
+    # 关系运算
+    '≈': '≈',
+    '≌': '≌',
+    '≡': '≡',
+    '≠': '≠',
+    '≤': '≤',
+    '≥': '≥',
+}
+
 def render_text_as_image(text, font_size, debug=False):
     """
     将文本渲染为图像
@@ -38,92 +54,8 @@ def render_text_as_image(text, font_size, debug=False):
         ax.set_facecolor((0, 0, 0, 0))
         ax.patch.set_alpha(0.0)
         
-        # 处理特殊数学符号
-        replacements = {
-            # --- 几何 / 图形 ---------------------------------------------------------
-            '⊥': r'$\perp$',
-            '⟂': r'$\perp$',
-            '∠': r'$\angle$',
-            '∥': r'$\parallel$',
-            '⊙': r'$\odot$',
-            '△': r'$\triangle$',
-
-            # --- 关系运算 -----------------------------------------------------------
-            '≈':  r'$\approx$',
-            '≌': r'$\approxeq$',
-            '≡': r'$\equiv$',
-            '≠': r'$\neq$',
-            '≤': r'$\leq$',
-            '≥': r'$\geq$',
-            '≮': r'$\not\!<$',
-            '≯': r'$\not\!>$',
-
-            # --- 集合 / 逻辑 --------------------------------------------------------
-            '∈': r'$\in$',
-            '∉': r'$\notin$',
-            '∪': r'$\cup$',
-            '∩': r'$\cap$',
-            '⊂': r'$\subset$',
-            '⊃': r'$\supset$',
-            '⊆': r'$\subseteq$',
-            '⊇': r'$\supseteq$',
-            '⊄': r'$\nsubseteq$',
-            '∀': r'$\forall$',
-            '∃': r'$\exists$',
-            '¬': r'$\neg$',
-
-            # --- 运算符 / 运算号 ------------------------------------------------------
-            '∑': r'$\sum$',
-            '∏': r'$\prod$',
-            '∫': r'$\int$',
-            '∮': r'$\oint$',
-            '∞': r'$\infty$',
-            '√': r'$\sqrt{}$',
-            '∂': r'$\partial$',
-            '×': r'$\times$',
-            '÷': r'$\div$',
-            '±': r'$\pm$',
-            '∓': r'$\mp$',
-            '·': r'$\cdot$',
-
-            # --- 箭头 / 映射 ---------------------------------------------------------
-            '→': r'$\to$',
-            '←': r'$\leftarrow$',
-            '↔': r'$\leftrightarrow$',
-            '⇒': r'$\Rightarrow$',
-            '⇐': r'$\Leftarrow$',
-            '⇔': r'$\Leftrightarrow$',
-            '↦': r'$\mapsto$',
-            '↗': r'$\nearrow$',
-            '↘': r'$\searrow$',
-            '↖': r'$\nwarrow$',
-            '↙': r'$\swarrow$',
-            '↺': r'$\circlearrowleft$',
-            '↻': r'$\circlearrowright$',
-
-            # --- 希腊字母（常用） ----------------------------------------------------
-            'α': r'$\alpha$',   'β': r'$\beta$',     'γ': r'$\gamma$',   'δ': r'$\delta$',
-            'ε': r'$\varepsilon$','ζ': r'$\zeta$',   'η': r'$\eta$',     'θ': r'$\theta$',
-            'λ': r'$\lambda$',  'μ': r'$\mu$',       'π': r'$\pi$',      'ρ': r'$\rho$',
-            'σ': r'$\sigma$',   'τ': r'$\tau$',      'φ': r'$\varphi$',  'χ': r'$\chi$',
-            'ψ': r'$\psi$',     'ω': r'$\omega$',
-            'Δ': r'$\Delta$',   'Θ': r'$\Theta$',    'Λ': r'$\Lambda$',  'Π': r'$\Pi$',
-            'Σ': r'$\Sigma$',   'Φ': r'$\Phi$',      'Ω': r'$\Omega$',
-
-            # --- 特殊标记 -----------------------------------------------------------
-            '°':  r'$^\circ$',                # 角度
-            '‰':  r'$\text{\textperthousand}$',  # 千分号
-            '℃':  r'$^\circ\mathrm{C}$',     # 摄氏度
-            '′':  r'$^\prime$',               # 分
-            '″':  r'$^{\prime\prime}$',      # 秒
-
-            # 添加平方符号的替换规则
-            '²': r'$^2$',
-            '³': r'$^3$',
-        }
-        
-        # 替换所有数学符号
-        for k, v in replacements.items():
+        # --- 转成 Unicode，彻底关闭 mathtext ---
+        for k, v in UNICODE_REPLACEMENTS.items():
             text = text.replace(k, v)
         
         # 尝试检测可用的中文字体
@@ -160,7 +92,9 @@ def render_text_as_image(text, font_size, debug=False):
                    color='white',
                    ha='center', va='center',
                    transform=ax.transAxes,
-                   family=chinese_font)
+                   family=chinese_font,
+                   usetex=False,          # 明确关闭 LaTeX
+                   parse_math=False)      # 关闭 mathtext（≥3.8）
         else:
             # 如果没有找到合适的中文字体，尝试用sans-serif字体族
             ax.text(0.5, 0.5, text, 
@@ -168,7 +102,9 @@ def render_text_as_image(text, font_size, debug=False):
                    color='white',
                    ha='center', va='center',
                    transform=ax.transAxes,
-                   family='sans-serif')
+                   family='sans-serif',
+                   usetex=False,          # 明确关闭 LaTeX
+                   parse_math=False)      # 关闭 mathtext（≥3.8）
             if debug and any('\u4e00' <= c <= '\u9fff' for c in text):
                 logger.warning("未找到中文字体，使用sans-serif族")
         
