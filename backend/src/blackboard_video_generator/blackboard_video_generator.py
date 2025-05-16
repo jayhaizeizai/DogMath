@@ -6,6 +6,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import os
 import time
+import json
 
 from .utils.image_utils import create_blackboard_background, blend_image_to_frame
 from .utils.video_utils import compress_video, get_z_index
@@ -65,24 +66,99 @@ class BlackboardVideoGenerator:
             except Exception as e:
                 self.logger.warning(f"无法获取字体列表: {str(e)}")
     
-    def generate_video(self, data):
-        """生成视频"""
+    def _auto_vertical_stack(self, step: dict) -> None:
+        """
+        自动垂直堆叠元素
+        
+        Args:
+            step: 步骤配置字典
+        """
+        safe = step.get('safe_zone', {})
+        safe_top = safe.get('top', 0.05)
+        safe_bottom = safe.get('bottom', 0.05)
+        safe_right = safe.get('right', 0.25)  # 默认右侧安全区为25%
+        v_space = step.get('vertical_spacing', 0.02)
+
+        y_cursor = safe_top  # 游标指向"下一行的顶边"
+        for el in step['elements']:
+            w_ratio, h_ratio = el['size']
+            
+            # 1. 处理 X 位置
+            if 'position' in el:
+                x = el['position'][0]
+            else:
+                x = 0.5  # 默认居中
+                
+            # 检查右侧安全区（使用半宽度判断）
+            if x + w_ratio/2 > 1 - safe_right:
+                x = 0.5 - safe_right / 2  # 把中心移到可见区域正中
+                
+            # 2. 设置中心点 Y ——顶边 + ½ 行高
+            anchor_y = y_cursor + h_ratio / 2
+            el['position'] = [x, anchor_y]
+            
+            # 3. 游标下移：整行高 + 垂直间距
+            y_cursor += h_ratio + v_space
+            
+        # 4. （可选）如果溢出底部安全区，可在这里整体 scale / 分页
+
+    def generate_video(self, blackboard_data: dict) -> str:
+        """
+        生成黑板视频
+        
+        Args:
+            blackboard_data: 黑板数据字典
+            
+        Returns:
+            临时视频文件路径
+        """
         try:
+            # 获取步骤列表
+            steps = blackboard_data.get('steps', [])
+            if not steps:
+                self.logger.error("未找到步骤数据")
+                return ""
+                
+            # 处理每个步骤
+            for step in steps:
+                # 处理每个元素
+                for element in step.get('elements', []):
+                    # 渲染元素并缓存尺寸
+                    if element['type'] == 'formula':
+                        img = render_formula(element['content'], element.get('font_size', 32), self.debug)
+                    elif element['type'] == 'text':
+                        img = render_text(element['content'], element.get('font_size', 32), self.debug)
+                    elif element['type'] == 'geometry':
+                        img = render_geometry(element['content'], scale_factor=element.get('scale', 1.0), debug=self.debug)
+                    else:
+                        continue
+                        
+                    # 缓存元素尺寸
+                    h_ratio = img.shape[0] / self.height
+                    w_ratio = img.shape[1] / self.width
+                    element['size'] = (w_ratio, h_ratio)
+                    
+                # 如果配置了自动垂直堆叠，则应用
+                if step.get('layout') == 'vertical-stack':
+                    self._auto_vertical_stack(step)
+                    
             # 获取视频参数
-            width = data['resolution'][0]
-            height = data['resolution'][1]
+            width = blackboard_data.get('resolution', [self.width, self.height])[0]
+            height = blackboard_data.get('resolution', [self.width, self.height])[1]
             fps = 30  # 默认帧率
             
+            # 创建临时输出路径
+            temp_output = "backend/output/temp_blackboard.mp4"
+            
             # 创建视频写入器
-            output_path = "backend/output/blackboard_video.mp4"
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            video_writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+            video_writer = cv2.VideoWriter(temp_output, fourcc, fps, (width, height))
             
             # 创建黑板背景
             background = create_blackboard_background(width, height)
             
             # 在创建timeline之前，识别几何元素和文本标签
-            for step in data['steps']:
+            for step in blackboard_data['steps']:
                 geometry_elements = []
                 text_elements = []
                 
@@ -100,7 +176,7 @@ class BlackboardVideoGenerator:
                     # 例如，可以根据几何图形的大小和位置调整文本标签的位置
             
             # 处理每个步骤
-            for step in data['steps']:
+            for step in blackboard_data['steps']:
                 # 计算总帧数
                 total_frames = int(step['duration'] * fps)
                 
@@ -130,20 +206,23 @@ class BlackboardVideoGenerator:
                         # 处理动画配置
                         animation = element.get('animation', {})
                         fade_in_frames = 0
+                        fade_out_frames = 0
                         
                         if animation:
                             fade_duration = animation.get('duration', 1.0)
                             fade_in_frames = int(fade_duration * fps)
+                            if 'exit' in animation:
+                                fade_out_frames = int(fade_duration * fps)
                         
-                        # 添加到时间线，包含所有必要的属性
+                        # 添加到时间线
                         timeline.append({
                             'type': element_type,
                             'content': content,
                             'position': element['position'],
-                            'start_frame': 0,  # 从开始就显示
-                            'end_frame': total_frames,  # 持续到结束
+                            'start_frame': 0,
+                            'end_frame': total_frames - fade_out_frames if fade_out_frames > 0 else total_frames,
                             'fade_in_frames': fade_in_frames,
-                            'fade_out_frames': 0,
+                            'fade_out_frames': fade_out_frames,
                             'z_index': get_z_index(element_type)
                         })
                 
@@ -158,12 +237,14 @@ class BlackboardVideoGenerator:
                     # 渲染当前帧的所有元素
                     for item in timeline:
                         if item['start_frame'] <= frame_idx < item['end_frame']:
-                            # 计算alpha值（淡入效果）
+                            # 计算alpha值（淡入淡出效果）
                             alpha = 1.0
                             if item['fade_in_frames'] > 0 and frame_idx < item['fade_in_frames']:
                                 alpha = frame_idx / item['fade_in_frames']
+                            elif item['fade_out_frames'] > 0 and frame_idx >= item['end_frame'] - item['fade_out_frames']:
+                                alpha = (item['end_frame'] - frame_idx) / item['fade_out_frames']
                             
-                            # 获取位置（0-1的比例值）
+                            # 获取位置
                             pos_x, pos_y = item['position']
                             
                             # 混合元素到帧中
@@ -180,13 +261,12 @@ class BlackboardVideoGenerator:
             video_writer.release()
             
             # 压缩视频
-            compress_video(output_path, self.logger)
+            compress_video(temp_output, self.logger)
             
-            return output_path
+            # 返回临时视频文件路径
+            return temp_output
             
         except Exception as e:
-            self.logger.error(f"生成视频时出错: {str(e)}")
-            import traceback
-            self.logger.error(traceback.format_exc())
-            return None
+            self.logger.error(f"视频生成失败: {str(e)}")
+            return ""
 
