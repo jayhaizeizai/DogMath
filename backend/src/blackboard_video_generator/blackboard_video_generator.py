@@ -76,7 +76,7 @@ class BlackboardVideoGenerator:
         safe = step.get('safe_zone', {})
         safe_top = safe.get('top', 0.05)
         safe_bottom = safe.get('bottom', 0.05)
-        safe_right = safe.get('right', 0.25)  # 默认右侧安全区为25%
+        safe_right = safe.get('right', 0.40)  # 增加右侧安全区为40%
         v_space = step.get('vertical_spacing', 0.02)
 
         y_cursor = safe_top  # 游标指向"下一行的顶边"

@@ -436,38 +436,47 @@ def main(json_path: str, output_dir: str):
             logger.error("视频音频合成失败，终止")
             return
 
-        # 根据配置决定是否生成和叠加教师视频
-        if Config.ENABLE_TEACHER_VIDEO:
+        # 独立控制是否生成教师视频
+        if Config.ENABLE_TEACHER_VIDEO_GENERATION:
             # 步骤4: 生成教师视频
             logger.info("步骤4: 生成教师视频")
             if not process_teacher_video(json_path, output_dir):
-                logger.error("教师视频生成失败，终止")
-                return
-                
+                logger.error("教师视频生成失败，继续执行后续步骤")
+                # 注意这里不return，继续执行
+        
+        # 独立控制是否叠加教师视频 - 不再嵌套在生成判断中
+        if Config.ENABLE_TEACHER_VIDEO_OVERLAY:
             # 步骤5: 叠加教师视频
             logger.info("步骤5: 叠加教师视频")
             teacher_video_dir = os.path.join(output_dir, "teacher_video")
-            teacher_videos = [
-                os.path.join(teacher_video_dir, f) 
-                for f in os.listdir(teacher_video_dir) 
-                if f.startswith("teacher_video_") and f.endswith(".mp4")
-            ]
+            
+            # 检查教师视频目录是否存在
+            if os.path.exists(teacher_video_dir):
+                teacher_videos = [
+                    os.path.join(teacher_video_dir, f) 
+                    for f in os.listdir(teacher_video_dir) 
+                    if f.startswith("teacher_video_") and f.endswith(".mp4")
+                ]
 
-            if not teacher_videos:
-                logger.error("未找到教师视频文件")
-                return
-                
-            # 记录找到的视频文件
-            logger.info(f"找到以下教师视频文件: {[os.path.basename(v) for v in teacher_videos]}")
+                if teacher_videos:
+                    # 记录找到的视频文件
+                    logger.info(f"找到以下教师视频文件: {[os.path.basename(v) for v in teacher_videos]}")
 
-            if overlay_teacher_video(temp_with_audio_path, teacher_videos, final_output_path):
-                logger.info(f"视频制作完成: {final_output_path}")
+                    if overlay_teacher_video(temp_with_audio_path, teacher_videos, final_output_path):
+                        logger.info(f"教师视频叠加完成: {final_output_path}")
+                    else:
+                        logger.error("教师视频叠加失败，使用无教师视频版本")
+                        os.rename(temp_with_audio_path, final_output_path)
+                else:
+                    logger.error("未找到教师视频文件，使用无教师视频版本")
+                    os.rename(temp_with_audio_path, final_output_path)
             else:
-                logger.error("教师视频叠加失败")
+                logger.error("教师视频目录不存在，使用无教师视频版本")
+                os.rename(temp_with_audio_path, final_output_path)
         else:
-            # 如果不生成教师视频，直接使用带音频的视频作为最终输出
+            # 如果不叠加教师视频，直接使用带音频的视频作为最终输出
             os.rename(temp_with_audio_path, final_output_path)
-            logger.info(f"视频制作完成（无教师视频）: {final_output_path}")
+            logger.info(f"视频制作完成（无教师视频叠加）: {final_output_path}")
             
         # 步骤6: 生成字幕文件
         logger.info("步骤6: 生成字幕文件")
