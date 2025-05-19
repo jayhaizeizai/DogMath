@@ -111,17 +111,22 @@ def render_latex_as_image(latex, font_size=24, skip_scaling=False, debug=False):
             canvas = trim_image(canvas)
             
             # 检查是否需要缩放图像
-            if not skip_scaling:  # 添加此条件
+            if not skip_scaling:
+                # 已有这些变量
                 max_width = 1920  # 最大宽度
                 max_height = 1080  # 最大高度
+                
+                # 考虑右侧安全区
+                safe_right = 0.40
+                adjusted_max_width = int(max_width * (1 - safe_right))
                 
                 h, w = canvas.shape[:2]
                 logger.debug(f"LaTeX公式原始图像大小: {w}x{h}")
                 
-                # 如果图像太大，进行等比例缩放
-                if w > max_width or h > max_height:
-                    scale = min(max_width / w, max_height / h)
-                    new_w = int(w * scale)
+                # 使用调整后的最大宽度
+                if w > adjusted_max_width:
+                    scale = adjusted_max_width / w
+                    new_w = adjusted_max_width
                     new_h = int(h * scale)
                     canvas = cv2.resize(canvas, (new_w, new_h), interpolation=cv2.INTER_AREA)
                     logger.debug(f"LaTeX公式缩放后图像大小: {new_w}x{new_h}")
@@ -204,14 +209,17 @@ def render_formula(formula, font_size, debug=False):
             max_width = 1920
             max_img_height = 1080
             
+            # 考虑右侧安全区
+            safe_right = 0.40
+            adjusted_max_width = int(max_width * (1 - safe_right))
+            
             h, w = combined_img.shape[:2]
             if debug:
                 logger.info(f"组合公式原始图像大小: {w}x{h}")
             
-            # 如果图像太大，进行等比例缩放
-            if w > max_width or h > max_img_height:
-                scale = min(max_width / w, max_height / h)
-                new_w = int(w * scale)
+            if w > adjusted_max_width:
+                scale = adjusted_max_width / w
+                new_w = adjusted_max_width
                 new_h = int(h * scale)
                 combined_img = cv2.resize(combined_img, (new_w, new_h), interpolation=cv2.INTER_AREA)
                 if debug:

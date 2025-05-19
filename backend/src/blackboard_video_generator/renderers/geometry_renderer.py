@@ -249,12 +249,29 @@ def calculate_bbox(commands: List[Dict[str, Any]]) -> Tuple[float, float, float,
     max_x = max(p[0] for p in points)
     max_y = max(p[1] for p in points)
     
+    # 为圆形特别处理
+    # 计算出的边界框扩大5-10%，确保完整显示
+    width = max_x - min_x
+    height = max_y - min_y
+    min_x -= width * 0.1
+    min_y -= height * 0.1
+    max_x += width * 0.1
+    max_y += height * 0.1
+    
     return (min_x, min_y, max_x, max_y)
 
 def calculate_transform(bbox: Tuple[float, float, float, float], canvas_size: Tuple[int, int], 
-                         scale_factor: float = 1.0, center_point: Tuple[float, float] = None) -> Tuple[float, float, float]:
+                         scale_factor: float = 1.0, center_point: Tuple[float, float] = None,
+                         safe_right: float = 0.40) -> Tuple[float, float, float]:
     """
     计算几何图形的变换参数（缩放和偏移）
+    
+    Args:
+        bbox: 边界框 (min_x, min_y, max_x, max_y)
+        canvas_size: 画布尺寸 (width, height)
+        scale_factor: 缩放因子
+        center_point: 中心点坐标
+        safe_right: 右侧安全区比例，默认40%
     """
     # 提取画布尺寸
     canvas_width, canvas_height = canvas_size
@@ -303,7 +320,7 @@ def calculate_transform(bbox: Tuple[float, float, float, float], canvas_size: Tu
         required_height = bbox_height
     
     # 调整安全边距，确保图形完全可见
-    safety_margin = 0.8  # 增加到0.8，给图形更多显示空间
+    safety_margin = 0.7  # 改为0.7或更小，给图形留更多空间
     
     # 计算基础缩放因子时考虑整体图形大小
     scale_x = (canvas_width * safety_margin) / required_width
@@ -318,8 +335,16 @@ def calculate_transform(bbox: Tuple[float, float, float, float], canvas_size: Tu
     final_scale = base_scale * scale_factor
     final_scale = min(max(final_scale, MIN_SCALE), MAX_SCALE)
     
-    # 计算偏移量，确保形状在画布中心
-    offset_x = canvas_width / 2 - use_center_x * final_scale
+    # 计算考虑安全区的画布中心点
+    # 向左偏移以避开右侧安全区
+    safe_center_x = canvas_width * (1 - safe_right) / 2
+    
+    # 计算偏移量，使形状居中于安全区域内
+    available_width = canvas_width * (1 - safe_right)
+    offset_x = (available_width / 2) - (use_center_x * final_scale)
+    # 确保至少有一个最小边距
+    min_margin = 20  # 像素
+    offset_x = max(offset_x, min_margin)
     offset_y = canvas_height / 2 - use_center_y * final_scale
     
     # 记录参数

@@ -89,9 +89,10 @@ class BlackboardVideoGenerator:
             else:
                 x = 0.5  # 默认居中
                 
-            # 检查右侧安全区（使用半宽度判断）
+            # 检查右侧安全区（使用全宽度判断，而非半宽度）
             if x + w_ratio/2 > 1 - safe_right:
-                x = 0.5 - safe_right / 2  # 把中心移到可见区域正中
+                # 确保元素完全在安全区内，给予额外余量
+                x = 0.5 - safe_right / 2 - w_ratio/4
                 
             # 2. 设置中心点 Y ——顶边 + ½ 行高
             anchor_y = y_cursor + h_ratio / 2

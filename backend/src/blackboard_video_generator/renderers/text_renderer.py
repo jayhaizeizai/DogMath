@@ -172,14 +172,18 @@ def render_text(text, font_size, debug=False):
     # 检查是否需要缩放图像
     max_width = 1920  # 最大宽度
     max_height = 1080  # 最大高度
-    
+
+    # 考虑右侧安全区
+    safe_right = 0.40  # 右侧40%留给教师视频
+    adjusted_max_width = int(max_width * (1 - safe_right))
+
     h, w = img.shape[:2]
     if debug:
         logger.info(f"文本原始图像大小: {w}x{h}")
     
     # 如果图像太大，进行等比例缩放
-    if w > max_width or h > max_height:
-        scale = min(max_width / w, max_height / h)
+    if w > adjusted_max_width or h > max_height:
+        scale = min(adjusted_max_width / w, max_height / h)
         new_w = int(w * scale)
         new_h = int(h * scale)
         img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
