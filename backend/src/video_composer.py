@@ -234,11 +234,55 @@ def overlay_teacher_video(main_video: str, teacher_videos: List[str], output_pat
         合成是否成功
     """
     try:
+        # 获取主视频时长
+        duration_cmd = [
+            "ffprobe", "-v", "error", 
+            "-show_entries", "format=duration", 
+            "-of", "default=noprint_wrappers=1:nokey=1", 
+            main_video
+        ]
+        process = subprocess.Popen(duration_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        main_duration = float(process.communicate()[0].decode().strip())
+        logger.info(f"主视频时长: {main_duration}秒")
+        
         # 确保视频按时间戳排序
         sorted_videos = sorted(teacher_videos, 
                              key=lambda x: get_timestamp_from_filename(os.path.basename(x)))
         logger.info(f"视频合并顺序: {[os.path.basename(v) for v in sorted_videos]}")
         
+        if not sorted_videos:
+            logger.error("没有可用的教师视频")
+            return False
+        
+        # 只有在未生成教师视频时才循环使用
+        if not Config.ENABLE_TEACHER_VIDEO_GENERATION:
+            # 计算所有教师视频的实际总时长
+            total_teacher_duration = 0
+            for video in sorted_videos:
+                duration_cmd = [
+                    "ffprobe", "-v", "error", 
+                    "-show_entries", "format=duration", 
+                    "-of", "default=noprint_wrappers=1:nokey=1", 
+                    video
+                ]
+                process = subprocess.Popen(duration_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                video_duration = float(process.communicate()[0].decode().strip())
+                total_teacher_duration += video_duration
+                
+            logger.info(f"教师视频总时长: {total_teacher_duration}秒")
+            
+            # 判断是否需要循环使用教师视频
+            original_videos = sorted_videos.copy()
+            if total_teacher_duration < main_duration:
+                repeat_times = int(main_duration / total_teacher_duration) + 1
+                logger.info(f"教师视频时长不足，需要循环使用 {repeat_times} 次")
+                # 重复添加视频直到总时长超过主视频
+                while len(sorted_videos) < repeat_times * len(original_videos):
+                    sorted_videos.extend(original_videos)
+                logger.info(f"循环后视频合并顺序: {[os.path.basename(v) for v in sorted_videos]}")
+        else:
+            logger.info("正常生成教师视频模式，按1:1方式使用教师视频")
+            
         # 创建临时文件用于存储教师视频列表
         with tempfile.NamedTemporaryFile(suffix='.txt', delete=False) as temp_file:
             temp_path = temp_file.name
@@ -258,7 +302,7 @@ def overlay_teacher_video(main_video: str, teacher_videos: List[str], output_pat
             logger.error("教师视频合并失败")
             return False
 
-        # 使用FFmpeg去除蓝色背景并叠加视频
+        # 使用FFmpeg去除蓝色背景并叠加视频，并明确限制输出视频长度为主视频长度
         overlay_cmd = [
             "ffmpeg", "-y",
             "-i", main_video,
@@ -279,6 +323,7 @@ def overlay_teacher_video(main_video: str, teacher_videos: List[str], output_pat
             "-crf", "20",
             "-preset", "medium",
             "-c:a", "copy",
+            "-shortest",  # 添加这个参数，确保输出视频长度为最短输入流的长度
             output_path,
         ]
         
