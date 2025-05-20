@@ -80,6 +80,41 @@ def generate_audio_segments(json_path: str, output_dir: str) -> str:
         logger.error("音频片段生成失败")
         return ""
 
+def synchronize_timing(audio_metadata_path: str, json_path: str) -> str:
+    """
+    根据音频元数据调整内容JSON的时间
+    
+    Args:
+        audio_metadata_path: 音频元数据文件路径
+        json_path: 内容JSON文件路径
+        
+    Returns:
+        调整后的JSON文件路径，失败则返回空字符串
+    """
+    # 生成输出路径
+    original_path = Path(json_path)
+    synchronized_path = str(original_path.parent / f"{original_path.stem}_synchronized{original_path.suffix}")
+    
+    # 调用timing_synchronizer的命令行接口
+    cmd = [
+        sys.executable,
+        "-m", "backend.src.timing_synchronizer.cli",
+        "--audio-metadata", audio_metadata_path,
+        "--content-json", json_path,
+        "--output", synchronized_path
+    ]
+    
+    if run_command(cmd):
+        if os.path.exists(synchronized_path):
+            logger.info(f"时间同步成功，生成调整后的JSON文件: {synchronized_path}")
+            return synchronized_path
+        else:
+            logger.error("调整后的JSON文件不存在")
+            return ""
+    else:
+        logger.error("时间同步失败")
+        return ""
+
 def generate_blackboard_video(json_path: str, output_path: str) -> bool:
     """
     生成黑板视频
@@ -468,31 +503,38 @@ def main(json_path: str, output_dir: str):
         if not audio_metadata_path:
             logger.error("音频片段生成失败，终止")
             return
+        
+        # 步骤2: 时间同步 - 调整内容JSON的时间
+        logger.info("步骤2: 调整内容JSON的时间以匹配音频")
+        synchronized_json_path = synchronize_timing(audio_metadata_path, json_path)
+        if not synchronized_json_path:
+            logger.error("时间同步失败，将使用原始JSON继续")
+            synchronized_json_path = json_path
             
-        # 步骤2: 生成黑板视频
-        logger.info("步骤2: 生成黑板视频")
-        if not generate_blackboard_video(json_path, temp_video_path):
+        # 步骤3: 生成黑板视频（使用调整后的JSON）
+        logger.info(f"步骤3: 生成黑板视频 (使用{synchronized_json_path})")
+        if not generate_blackboard_video(synchronized_json_path, temp_video_path):
             logger.error("黑板视频生成失败，终止")
             return
             
-        # 步骤3: 合成视频和音频
-        logger.info("步骤3: 合成视频和音频")
+        # 步骤4: 合成视频和音频
+        logger.info("步骤4: 合成视频和音频")
         if not compose_video(temp_video_path, audio_metadata_path, temp_with_audio_path):
             logger.error("视频音频合成失败，终止")
             return
 
         # 独立控制是否生成教师视频
         if Config.ENABLE_TEACHER_VIDEO_GENERATION:
-            # 步骤4: 生成教师视频
-            logger.info("步骤4: 生成教师视频")
+            # 步骤5: 生成教师视频
+            logger.info("步骤5: 生成教师视频")
             if not process_teacher_video(json_path, output_dir):
                 logger.error("教师视频生成失败，继续执行后续步骤")
                 # 注意这里不return，继续执行
         
         # 独立控制是否叠加教师视频 - 不再嵌套在生成判断中
         if Config.ENABLE_TEACHER_VIDEO_OVERLAY:
-            # 步骤5: 叠加教师视频
-            logger.info("步骤5: 叠加教师视频")
+            # 步骤6: 叠加教师视频
+            logger.info("步骤6: 叠加教师视频")
             teacher_video_dir = os.path.join(output_dir, "teacher_video")
             
             # 检查教师视频目录是否存在
@@ -523,8 +565,8 @@ def main(json_path: str, output_dir: str):
             os.rename(temp_with_audio_path, final_output_path)
             logger.info(f"视频制作完成（无教师视频叠加）: {final_output_path}")
             
-        # 步骤6: 生成字幕文件
-        logger.info("步骤6: 生成字幕文件")
+        # 步骤7: 生成字幕文件
+        logger.info("步骤7: 生成字幕文件")
         subtitle_path = os.path.join(output_dir, "subtitle.srt")
         audio_metadata_path = os.path.join(output_dir, "audio_segments", "audio_metadata.json")
         
@@ -532,12 +574,13 @@ def main(json_path: str, output_dir: str):
             logger.error("音频元数据文件不存在")
             return
             
-        if not generate_subtitle_file(json_path, audio_metadata_path, subtitle_path):
+        # 使用同步后的JSON生成字幕，以确保字幕与音频同步
+        if not generate_subtitle_file(synchronized_json_path, audio_metadata_path, subtitle_path):
             logger.error("字幕文件生成失败")
             return
             
-        # 步骤7: 添加字幕
-        logger.info("步骤7: 添加字幕")
+        # 步骤8: 添加字幕
+        logger.info("步骤8: 添加字幕")
         temp_final_path = os.path.join(output_dir, "temp_final.mp4")
         os.rename(final_output_path, temp_final_path)
         
@@ -553,6 +596,17 @@ def main(json_path: str, output_dir: str):
         for temp_file in [temp_video_path, temp_with_audio_path, temp_final_path, subtitle_path]:
             if os.path.exists(temp_file):
                 os.unlink(temp_file)
+        
+        # 清理同步生成的临时JSON文件
+        if synchronized_json_path != json_path and os.path.exists(synchronized_json_path):
+            os.unlink(synchronized_json_path)
+            logger.info(f"已清理临时同步JSON文件: {synchronized_json_path}")
+            
+        # 清理同步报告JSON文件
+        report_path = Path(synchronized_json_path).with_suffix('.report.json')
+        if os.path.exists(report_path):
+            os.unlink(report_path)
+            logger.info(f"已清理同步报告文件: {report_path}")
             
     except Exception as e:
         logger.error(f"视频制作过程中出现错误: {str(e)}")
