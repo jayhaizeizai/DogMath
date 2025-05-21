@@ -18,11 +18,11 @@ def render_latex_as_image(latex, font_size=24, skip_scaling=False, debug=False):
     Args:
         latex: LaTeX公式字符串
         font_size: 字体大小
-        skip_scaling: 是否跳过缩放
+        skip_scaling: 是否跳过缩放 (注意：此标志可能需要重新评估，但我们首先确保内部缩放逻辑正确)
         debug: 是否输出调试信息
         
     Returns:
-        渲染后的图像
+        渲染后的图像 (已裁剪和缩放)
     """
     try:
         logger.info(f"渲染LaTeX公式: {latex}, 字体大小: {font_size}")
@@ -111,25 +111,22 @@ def render_latex_as_image(latex, font_size=24, skip_scaling=False, debug=False):
             canvas = trim_image(canvas)
             
             # 检查是否需要缩放图像
-            if not skip_scaling:
-                # 已有这些变量
-                max_width = 1920  # 最大宽度
-                max_height = 1080  # 最大高度
+            if not skip_scaling: # This flag is important. If True, no scaling happens here.
+                max_width_screen = 1920
+                safe_right_factor = 0.40 # Use a consistent factor
+                target_max_content_width = int(max_width_screen * (1 - safe_right_factor))
                 
-                # 考虑右侧安全区
-                safe_right = 0.40
-                adjusted_max_width = int(max_width * (1 - safe_right))
+                h_canvas, w_canvas = canvas.shape[:2]
+                if debug:
+                    logger.debug(f"LaTeX content (after trim): {w_canvas}x{h_canvas}. Target max width: {target_max_content_width}")
                 
-                h, w = canvas.shape[:2]
-                logger.debug(f"LaTeX公式原始图像大小: {w}x{h}")
-                
-                # 使用调整后的最大宽度
-                if w > adjusted_max_width:
-                    scale = adjusted_max_width / w
-                    new_w = adjusted_max_width
-                    new_h = int(h * scale)
+                if w_canvas > target_max_content_width:
+                    scale = target_max_content_width / w_canvas
+                    new_w = target_max_content_width
+                    new_h = int(h_canvas * scale)
                     canvas = cv2.resize(canvas, (new_w, new_h), interpolation=cv2.INTER_AREA)
-                    logger.debug(f"LaTeX公式缩放后图像大小: {new_w}x{new_h}")
+                    if debug:
+                        logger.debug(f"LaTeX content scaled to: {new_w}x{new_h}")
             
             return canvas
         else:
@@ -154,98 +151,95 @@ def render_formula(formula, font_size, debug=False):
         debug: 是否输出调试信息
         
     Returns:
-        公式图像
+        公式图像 (已确保宽度不超过安全区内容限制)
     """
     try:
         logger.info(f"渲染公式: {formula}, 字体大小: {font_size}")
-        # 检测是否含有中文
+        
+        max_width_screen = 1920
+        safe_right_factor = 0.40
+        adjusted_max_content_width = int(max_width_screen * (1 - safe_right_factor))
+
         has_chinese = any('\u4e00' <= c <= '\u9fff' for c in formula)
-        logger.debug(f"公式是否包含中文: {has_chinese}")
-        
-        # 检测是否含有LaTeX格式的公式
         is_latex = '\\' in formula or '$' in formula
-        logger.debug(f"公式是否为LaTeX格式: {is_latex}")
         
-        # 混合内容处理（中文+LaTeX）
-        if has_chinese and is_latex:
-            # 分割文本和LaTeX公式
+        rendered_image = None
+
+        if has_chinese and is_latex: # 混合内容处理
             components = re.split(r'(\$[^$]*\$)', formula)
-            logger.debug(f"分割后的组件: {components}")
-            
-            # 处理多个LaTeX部分
             rendered_parts = []
             
             for comp in components:
-                if comp.strip():  # 忽略空字符串
+                if comp.strip():
                     if comp.startswith('$') and comp.endswith('$'):
-                        # 渲染LaTeX部分
-                        latex_img = render_latex_as_image(comp, font_size, skip_scaling=True, debug=debug)
-                        rendered_parts.append(latex_img)
-                        logger.debug(f"渲染LaTeX部分: {comp}, 大小: {latex_img.shape}")
+                        # render_latex_as_image already handles its own scaling if skip_scaling=False
+                        # For consistency in combined image, pass skip_scaling=True and scale combined later,
+                        # OR ensure render_latex_as_image is robust. Let's assume it is robust for now.
+                        part_img = render_latex_as_image(comp, font_size, skip_scaling=False, debug=debug)
+                        rendered_parts.append(part_img)
                     else:
-                        # 渲染中文部分
-                        chinese_img = render_text_as_image(comp, font_size, debug=debug)
-                        rendered_parts.append(chinese_img)
-                        logger.debug(f"渲染中文部分: {comp}, 大小: {chinese_img.shape}")
+                        # render_text_as_image might not have internal scaling.
+                        # We'll scale the combined image.
+                        part_img = render_text_as_image(comp, font_size, debug=debug)
+                        rendered_parts.append(part_img)
             
-            # 计算总宽度和最大高度
-            total_width = sum(img.shape[1] for img in rendered_parts) + 5 * (len(rendered_parts) - 1)
-            max_height = max(img.shape[0] for img in rendered_parts)
-            logger.debug(f"组合图像总宽度: {total_width}, 最大高度: {max_height}")
+            if not rendered_parts: # Handle cases where splitting results in no parts
+                logger.warning(f"混合公式 '{formula}' 分割后没有有效部分。")
+                # Return a small error image or handle appropriately
+                error_img = np.ones((50, 200, 3), dtype=np.uint8) * np.array([30, 30, 30], dtype=np.uint8)
+                cv2.putText(error_img, "Empty Formula", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,0,0), 1)
+                return error_img
+
+            total_parts_width = sum(img.shape[1] for img in rendered_parts) + 5 * (len(rendered_parts) - 1 if len(rendered_parts) > 0 else 0)
+            max_parts_height = max(img.shape[0] for img in rendered_parts) if rendered_parts else 50
             
-            # 创建组合图像
-            combined_img = np.ones((max_height, total_width, 3), dtype=np.uint8) * np.array([30, 30, 30], dtype=np.uint8)
-            
-            # 放置各个部分
+            combined_img = np.ones((max_parts_height, total_parts_width, 3), dtype=np.uint8) * np.array([30, 30, 30], dtype=np.uint8)
             x_offset = 0
-            for img in rendered_parts:
-                h, w = img.shape[:2]
-                y_offset = (max_height - h) // 2
-                combined_img[y_offset:y_offset+h, x_offset:x_offset+w] = img
-                x_offset += w + 5  # 恢复为5像素的间隔
-                logger.debug(f"放置图像部分，当前x_offset: {x_offset}")
+            for img_part in rendered_parts:
+                h_part, w_part = img_part.shape[:2]
+                y_offset = (max_parts_height - h_part) // 2
+                combined_img[y_offset:y_offset+h_part, x_offset:x_offset+w_part] = img_part
+                x_offset += w_part + 5
             
-            # 检查是否需要缩放最终图像
-            max_width = 1920
-            max_img_height = 1080
-            
-            # 考虑右侧安全区
-            safe_right = 0.40
-            adjusted_max_width = int(max_width * (1 - safe_right))
-            
-            h, w = combined_img.shape[:2]
-            if debug:
-                logger.info(f"组合公式原始图像大小: {w}x{h}")
-            
-            if w > adjusted_max_width:
-                scale = adjusted_max_width / w
-                new_w = adjusted_max_width
-                new_h = int(h * scale)
-                combined_img = cv2.resize(combined_img, (new_w, new_h), interpolation=cv2.INTER_AREA)
-                if debug:
-                    logger.info(f"组合公式缩放后图像大小: {new_w}x{new_h}")
-            
-            # 裁剪图像
-            combined_img = trim_image(combined_img)
-            return combined_img
-        
-        # 对于纯中文公式(不含LaTeX格式)
-        if has_chinese and not is_latex:
-            return render_text_as_image(formula, font_size, debug=debug)
-            
-        # 对于纯LaTeX公式
-        if is_latex:
-            # 确保LaTeX公式有$符号
+            rendered_image = combined_img
+
+        elif is_latex: # 对于纯LaTeX公式
             if not formula.startswith('$') and not formula.endswith('$'):
                 formula = f'${formula}$'
-            return render_latex_as_image(formula, font_size, debug=debug)
+            # render_latex_as_image will handle scaling if skip_scaling=False
+            rendered_image = render_latex_as_image(formula, font_size, skip_scaling=False, debug=debug)
         
-        # 对于普通文本
-        return render_text_as_image(formula, font_size, debug=debug)
+        else: # 对于纯中文公式或普通文本 (covers has_chinese and not is_latex, and not has_chinese and not is_latex)
+            rendered_image = render_text_as_image(formula, font_size, debug=debug)
+
+        # 统一的最后处理：裁剪和缩放
+        if rendered_image is None: # Should not happen if logic above is correct
+            logger.error(f"未能渲染公式: {formula}")
+            error_img = np.ones((50, 200, 3), dtype=np.uint8) * np.array([30, 30, 30], dtype=np.uint8)
+            cv2.putText(error_img, "Render Error", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,0,0), 1)
+            return error_img
+
+        # 1. 裁剪掉边缘空白
+        final_image = trim_image(rendered_image)
+        h_final, w_final = final_image.shape[:2]
+        if debug:
+            logger.debug(f"公式 '{formula[:20]}...' (after trim): {w_final}x{h_final}. Target max width: {adjusted_max_content_width}")
+
+        # 2. 如果裁剪后宽度仍然超出，则缩放
+        if w_final > adjusted_max_content_width:
+            scale = adjusted_max_content_width / w_final
+            new_w = adjusted_max_content_width
+            new_h = int(h_final * scale)
+            final_image = cv2.resize(final_image, (new_w, new_h), interpolation=cv2.INTER_AREA)
+            if debug:
+                logger.debug(f"公式 '{formula[:20]}...' scaled to: {new_w}x{new_h}")
+        
+        return final_image
         
     except Exception as e:
-        logger.error(f"渲染公式时出错: {str(e)}")
+        logger.error(f"渲染公式时出错: {formula}, Error: {str(e)}")
+        logger.error(traceback.format_exc())
         # 创建一个默认图像
-        img = np.zeros((100, 300, 3), dtype=np.uint8)
-        cv2.putText(img, "Formula Error", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        img = np.ones((50, 200, 3), dtype=np.uint8) * np.array([30, 30, 30], dtype=np.uint8)
+        cv2.putText(img, "Formula Error", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 1)
         return img 

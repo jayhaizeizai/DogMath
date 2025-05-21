@@ -69,39 +69,42 @@ class BlackboardVideoGenerator:
     def _auto_vertical_stack(self, step: dict) -> None:
         """
         自动垂直堆叠元素
-        
-        Args:
-            step: 步骤配置字典
         """
         safe = step.get('safe_zone', {})
         safe_top = safe.get('top', 0.05)
-        safe_bottom = safe.get('bottom', 0.05)
-        safe_right = safe.get('right', 0.40)  # 增加右侧安全区为40%
+        # safe_bottom = safe.get('bottom', 0.05) # Not used in current logic
+        safe_right = safe.get('right', 0.40) 
         v_space = step.get('vertical_spacing', 0.02)
 
-        y_cursor = safe_top  # 游标指向"下一行的顶边"
+        y_cursor = safe_top
         for el in step['elements']:
-            w_ratio, h_ratio = el['size']
+            w_ratio, h_ratio = el['size'] # w_ratio is based on the *content-only* image width
             
-            # 1. 处理 X 位置
-            if 'position' in el:
-                x = el['position'][0]
-            else:
-                x = 0.5  # 默认居中
-                
-            # 检查右侧安全区（使用全宽度判断，而非半宽度）
-            if x + w_ratio/2 > 1 - safe_right:
-                # 确保元素完全在安全区内，给予额外余量
-                x = 0.5 - safe_right / 2 - w_ratio/4
-                
-            # 2. 设置中心点 Y ——顶边 + ½ 行高
+            current_x_pos = 0.0 # Default, will be overwritten
+
+            if 'position' in el and el['position'] is not None: # Check if position is explicitly set
+                current_x_pos = el['position'][0]
+            else: # Auto-calculate x
+                if el['type'] == 'formula':
+                    # Center of the formula content should be at (width_of_content / 2)
+                    # so its left edge aligns with screen x=0
+                    current_x_pos = w_ratio / 2 
+                else:
+                    # Center other elements in the available content area
+                    # Content area width = 1.0 - safe_right
+                    # Center of content area = (1.0 - safe_right) / 2
+                    current_x_pos = (1.0 - safe_right) / 2
+            
+            # Check if formula content (even if positioned at w_ratio/2) would spill
+            # This check might be redundant if render_formula correctly limits width
+            # Effective right edge of content = current_x_pos (center) + w_ratio / 2 (half_width)
+            # if el['type'] == 'formula' and (current_x_pos + w_ratio / 2 > (1.0 - safe_right)):
+            #    self.logger.warning(f"Formula {el.get('content','')} might be too wide for content area even after positioning.")
+
             anchor_y = y_cursor + h_ratio / 2
-            el['position'] = [x, anchor_y]
+            el['position'] = [current_x_pos, anchor_y]
             
-            # 3. 游标下移：整行高 + 垂直间距
             y_cursor += h_ratio + v_space
-            
-        # 4. （可选）如果溢出底部安全区，可在这里整体 scale / 分页
 
     def generate_video(self, blackboard_data: dict) -> str:
         """
@@ -134,10 +137,12 @@ class BlackboardVideoGenerator:
                     else:
                         continue
                         
-                    # 缓存元素尺寸
+                    # 修改：缓存元素的真实尺寸
                     h_ratio = img.shape[0] / self.height
                     w_ratio = img.shape[1] / self.width
                     element['size'] = (w_ratio, h_ratio)
+                    # 保存原始图像供后续使用
+                    element['image'] = img
                     
                 # 如果配置了自动垂直堆叠，则应用
                 if step.get('layout') == 'vertical-stack':
@@ -248,8 +253,11 @@ class BlackboardVideoGenerator:
                             # 获取位置
                             pos_x, pos_y = item['position']
                             
+                            # 获取图像内容
+                            content = item['content']
+                            
                             # 混合元素到帧中
-                            blend_image_to_frame(frame, item['content'], pos_x, pos_y, alpha, self.debug)
+                            blend_image_to_frame(frame, content, pos_x, pos_y, alpha, self.debug)
                     
                     # 写入帧
                     video_writer.write(frame)
