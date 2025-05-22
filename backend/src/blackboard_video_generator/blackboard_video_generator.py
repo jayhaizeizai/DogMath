@@ -8,6 +8,9 @@ import os
 import time
 import json
 
+# 1️⃣ 添加常量定义：15% 高度专门留给字幕
+MIN_BOTTOM_SAFE = 0.15
+
 from .utils.image_utils import create_blackboard_background, blend_image_to_frame
 from .utils.video_utils import compress_video, get_z_index
 from .renderers.text_renderer import render_text
@@ -66,44 +69,82 @@ class BlackboardVideoGenerator:
             except Exception as e:
                 self.logger.warning(f"无法获取字体列表: {str(e)}")
     
+    def _scale_step_content(self, step: dict) -> None:
+        """
+        计算 (1) 纵向可用高度、(2) 横向可用宽度 ，
+        取二者里更严格的缩放因子，等比缩小元素 & 行间距。
+        """
+        safe = step.get("safe_zone", {})
+        safe_top    = safe.get("top", 0.05)
+        safe_bottom = max(safe.get("bottom", MIN_BOTTOM_SAFE), MIN_BOTTOM_SAFE)
+        safe_right  = safe.get("right", 0.40)
+
+        v_space = step.get("vertical_spacing", 0.02)
+        elems   = step.get("elements", [])
+
+        # ---------- ① 纵向约束 ----------
+        total_h_ratio = sum(el["size"][1] for el in elems) \
+                        + v_space * (len(elems) - 1)
+        avail_h_ratio = 1.0 - safe_top - safe_bottom
+        scale_v = avail_h_ratio / total_h_ratio if total_h_ratio > 0 else 1.0
+
+        # ---------- ② 横向约束 ----------
+        max_w_ratio   = max(el["size"][0] for el in elems) if elems else 0.0
+        avail_w_ratio = 1.0 - safe_right
+        scale_h = avail_w_ratio / max_w_ratio if max_w_ratio > 0 else 1.0
+
+        # ---------- ③ 取两者最小值 ----------
+        scale = min(scale_v, scale_h, 1.0)
+        if scale >= 1.0:    # 不需要缩放
+            return
+
+        # 同步缩放行间距
+        step["vertical_spacing"] = v_space * scale
+
+        # 缩小像素 & ratio 尺寸
+        for el in elems:
+            img = el["image"]
+            h,  w = img.shape[:2]
+            new_w, new_h = max(1, int(w * scale)), max(1, int(h * scale))
+            el["image"]  = cv2.resize(img, (new_w, new_h),
+                                    interpolation=cv2.INTER_AREA)
+            el["size"]   = (new_w / self.width, new_h / self.height)
+
+        if self.debug:
+            self.logger.info(
+                f"Step {step.get('step_id')} 自动缩放: scale_v={scale_v:.3f}, "
+                f"scale_h={scale_h:.3f}, 使用={scale:.3f}"
+            )
+
     def _auto_vertical_stack(self, step: dict) -> None:
         """
-        自动垂直堆叠元素
+        把 center 定义在可见内容区：
+            左 = 0，右 = 1 - safe_right
+        无论 text / formula / geometry 都水平居中摆放；
+        有显式 'position' 的，只保留用户给的 x。
         """
-        safe = step.get('safe_zone', {})
-        safe_top = safe.get('top', 0.05)
-        # safe_bottom = safe.get('bottom', 0.05) # Not used in current logic
-        safe_right = safe.get('right', 0.40) 
+        safe  = step.get('safe_zone', {})
+        safe_top    = safe.get('top', 0.05)
+        safe_bottom = max(safe.get('bottom', MIN_BOTTOM_SAFE), MIN_BOTTOM_SAFE)
+        safe_right  = safe.get('right', 0.40)
+
+        avail_width_center = (1.0 - safe_right) / 2      # 内容区中心
         v_space = step.get('vertical_spacing', 0.02)
 
         y_cursor = safe_top
         for el in step['elements']:
-            w_ratio, h_ratio = el['size'] # w_ratio is based on the *content-only* image width
-            
-            current_x_pos = 0.0 # Default, will be overwritten
+            w_ratio, h_ratio = el['size']
 
-            if 'position' in el and el['position'] is not None: # Check if position is explicitly set
-                current_x_pos = el['position'][0]
-            else: # Auto-calculate x
-                if el['type'] == 'formula':
-                    # Center of the formula content should be at (width_of_content / 2)
-                    # so its left edge aligns with screen x=0
-                    current_x_pos = w_ratio / 2 
-                else:
-                    # Center other elements in the available content area
-                    # Content area width = 1.0 - safe_right
-                    # Center of content area = (1.0 - safe_right) / 2
-                    current_x_pos = (1.0 - safe_right) / 2
-            
-            # Check if formula content (even if positioned at w_ratio/2) would spill
-            # This check might be redundant if render_formula correctly limits width
-            # Effective right edge of content = current_x_pos (center) + w_ratio / 2 (half_width)
-            # if el['type'] == 'formula' and (current_x_pos + w_ratio / 2 > (1.0 - safe_right)):
-            #    self.logger.warning(f"Formula {el.get('content','')} might be too wide for content area even after positioning.")
+            # -------- X 方向 ----------
+            if el.get('position'):                       # 用户手动给 x
+                current_x = el['position'][0]
+            else:
+                current_x = avail_width_center           # 全部水平居中
 
+            # -------- Y 方向 ----------
             anchor_y = y_cursor + h_ratio / 2
-            el['position'] = [current_x_pos, anchor_y]
-            
+            el['position'] = [current_x, anchor_y]
+
             y_cursor += h_ratio + v_space
 
     def generate_video(self, blackboard_data: dict) -> str:
@@ -143,7 +184,10 @@ class BlackboardVideoGenerator:
                     element['size'] = (w_ratio, h_ratio)
                     # 保存原始图像供后续使用
                     element['image'] = img
-                    
+                
+                # 应用内容缩放确保所有内容符合安全区
+                self._scale_step_content(step)
+                
                 # 如果配置了自动垂直堆叠，则应用
                 if step.get('layout') == 'vertical-stack':
                     self._auto_vertical_stack(step)
@@ -192,21 +236,17 @@ class BlackboardVideoGenerator:
                 # 处理每个元素
                 for element in step['elements']:
                     element_type = element['type']
-                    content = None
                     
-                    # 根据元素类型渲染内容
-                    if element_type == 'text':
-                        if self.debug:
-                            self.logger.debug(f"渲染文本元素: {element['content'][:30]}...")
-                        content = render_text(element['content'], element.get('font_size', 32), self.debug)
-                    elif element_type == 'formula':
-                        if self.debug:
-                            self.logger.debug(f"渲染公式元素: {element['content'][:30]}...")
-                        content = render_formula(element['content'], element.get('font_size', 32), self.debug)
-                    elif element_type == 'geometry':
-                        if self.debug:
-                            self.logger.debug(f"渲染几何元素，包含键: {list(element['content'].keys())}")
-                        content = render_geometry(element['content'], scale_factor=element.get('scale', 1.0), debug=self.debug)
+                    # ✦✦ 新：直接取缓存的缩放后 bitmap ✦✦
+                    content = element['image']          # 已经 resize 过
+                    if content is None:
+                        # 理论上不会走到这里，兜底
+                        if element_type == 'text':
+                            content = render_text(element['content'], element.get('font_size', 32), self.debug)
+                        elif element_type == 'formula':
+                            content = render_formula(element['content'], element.get('font_size', 32), self.debug)
+                        elif element_type == 'geometry':
+                            content = render_geometry(element['content'], scale_factor=element.get('scale', 1.0), debug=self.debug)
                     
                     if content is not None:
                         # 处理动画配置
