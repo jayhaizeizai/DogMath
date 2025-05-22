@@ -161,8 +161,16 @@ def render_formula(formula, font_size, debug=False):
         adjusted_max_content_width = int(max_width_screen * (1 - safe_right_factor))
 
         has_chinese = any('\u4e00' <= c <= '\u9fff' for c in formula)
-        is_latex = '\\' in formula or '$' in formula
+        is_latex    = '\\' in formula or '$' in formula
         
+        # ------- 新增：若检测到 LaTeX 命令但没有任何 $，直接整式转 LaTeX -------
+        if is_latex and '$' not in formula:
+            if not formula.startswith('$'):
+                formula = f'${formula}$'
+            # 直接走纯 LaTeX 分支（含中文也没问题，render_latex_as_image 已加载 ctex）
+            return render_latex_as_image(formula, font_size, skip_scaling=False, debug=debug)
+        # ------------------------------------------------------------------------
+
         rendered_image = None
 
         if has_chinese and is_latex: # 混合内容处理
