@@ -55,57 +55,99 @@ class TimingSynchronizer:
         if not self.content_json or not self.audio_metadata:
             self.load_data()
         
-        # 从内容JSON获取步骤的原始时间信息作为参考
         original_step_times = []
         current_time = 0
         for step in self.content_json["blackboard"]["steps"]:
-            step_id = step["step_id"]
+            step_id_int = step["step_id"] # Ensuring this is an int
             duration = step["duration"]
             original_step_times.append({
-                "step_id": step_id,
+                "step_id": step_id_int,
                 "start_time": current_time,
                 "end_time": current_time + duration
             })
             current_time += duration
         
-        # 为每个步骤关联对应的音频段落
         step_to_audio = {}
         for step_info in original_step_times:
-            step_to_audio[step_info["step_id"]] = []
+            step_to_audio[step_info["step_id"]] = [] # Keys are integers
         
-        # 将每个音频段落映射到相应的步骤
         for segment in self.audio_metadata:
-            # 根据音频段落的开始时间找到对应的步骤
-            step_id = self.map_time_to_step_id(segment["start_time"])
-            if step_id is not None:
-                step_to_audio[step_id].append(segment)
+            # map_time_to_step_id returns a tuple (start_step_id, end_step_id)
+            # When called with only start_time, it effectively uses end_time=None,
+            # and both elements of the returned tuple should be the same integer step_id (or None).
+            mapping_result_tuple = self.map_time_to_step_id(segment["start_time"])
+            
+            # The first element of the tuple is the actual start_step_id (integer or None)
+            actual_start_step_id_for_segment = mapping_result_tuple[0] 
+            
+            if actual_start_step_id_for_segment is not None:
+                # Ensure the key used for step_to_audio is an integer
+                if actual_start_step_id_for_segment in step_to_audio:
+                    step_to_audio[actual_start_step_id_for_segment].append(segment)
+                else:
+                    # This case might indicate an issue if map_time_to_step_id returns an ID
+                    # not present in original_step_times, or if step_id was not an int.
+                    logger.warning(
+                        f"Step ID {actual_start_step_id_for_segment} (type: {type(actual_start_step_id_for_segment)}) "
+                        f"from map_time_to_step_id not found as an initialized key in step_to_audio. "
+                        f"Segment: {segment}"
+                    )
+            else:
+                logger.warning(f"Segment {segment} could not be mapped to a starting step_id in create_step_audio_mapping.")
         
         return step_to_audio
     
-    def map_time_to_step_id(self, time_point: float) -> Optional[int]:
+    def map_time_to_step_id(self, start_time: float, end_time: float = None) -> Tuple[Optional[int], Optional[int]]:
         """
-        将时间点映射到对应的黑板步骤ID。
+        将音频时间点或时间范围映射到对应的黑板步骤ID。
         
         Args:
-            time_point: 要映射的时间点（秒）
+            start_time: 开始时间点（秒）
+            end_time: 结束时间点（秒），如果提供，将返回覆盖的所有步骤
             
         Returns:
-            对应的步骤ID，如果没有匹配则返回None
+            Tuple[Optional[int], Optional[int]]: (开始步骤ID, 结束步骤ID)，如果没有匹配则返回(None, None)
         """
         if not self.content_json:
             self.load_data()
-            
+        
         current_time = 0
-        for step in self.content_json["blackboard"]["steps"]:
+        start_step_id = None
+        end_step_id = None
+        
+        for i, step in enumerate(self.content_json["blackboard"]["steps"]):
             step_id = step["step_id"]
             duration = step["duration"]
+            step_start = current_time
+            step_end = current_time + duration
             
-            if current_time <= time_point < (current_time + duration):
-                return step_id
-                
+            # 找出开始时间所在的步骤
+            if start_step_id is None and step_start <= start_time < step_end:
+                start_step_id = step_id
+            
+            # 如果提供了结束时间，找出结束时间所在的步骤
+            if end_time is not None:
+                if step_start < end_time <= step_end:
+                    end_step_id = step_id
+                    break
+                # 如果结束时间超过了最后一个步骤
+                if i == len(self.content_json["blackboard"]["steps"]) - 1 and end_time > step_end:
+                    end_step_id = step_id  # 使用最后一个步骤
+                    break
+            else:
+                # 如果没有提供结束时间，则开始和结束步骤相同
+                if start_step_id is not None:
+                    end_step_id = start_step_id
+                    break
+            
             current_time += duration
-            
-        return None
+        
+        # 如果结束步骤仍未找到但开始步骤已找到，
+        # 将结束步骤设为最后一个步骤
+        if start_step_id is not None and end_step_id is None:
+            end_step_id = self.content_json["blackboard"]["steps"][-1]["step_id"]
+        
+        return (start_step_id, end_step_id)
     
     def get_actual_audio_durations(self) -> Dict[int, float]:
         """
@@ -117,32 +159,40 @@ class TimingSynchronizer:
         if not self.audio_metadata:
             self.load_data()
             
-        segments = {}
+        segments = {} # Keys for this dictionary should be integer step_ids
         for segment in self.audio_metadata:
-            start_time = segment["start_time"]
-            end_time = segment["end_time"]
+            audio_segment_start_time = segment["start_time"]
+            audio_segment_end_time = segment["end_time"]
             
-            # 将音频段落映射到对应的黑板步骤
-            step_id = self.map_time_to_step_id(start_time)
-            if step_id not in segments:
-                segments[step_id] = []
-                
-            segments[step_id].append((start_time, end_time))
+            # map_time_to_step_id returns a tuple (start_step_id, end_step_id)
+            # For this function's original logic, we're interested in where the segment starts.
+            mapping_result_tuple = self.map_time_to_step_id(audio_segment_start_time)
+            step_id_for_segment_start = mapping_result_tuple[0] # This should be an integer or None
+
+            if step_id_for_segment_start is not None:
+                if step_id_for_segment_start not in segments:
+                    segments[step_id_for_segment_start] = []
+                segments[step_id_for_segment_start].append((audio_segment_start_time, audio_segment_end_time))
+            else:
+                logger.warning(
+                    f"Segment starting at {audio_segment_start_time} could not be mapped to a step in get_actual_audio_durations."
+                )
         
-        # 计算每个步骤的实际时长
         step_durations = {}
-        for step_id, time_ranges in segments.items():
-            if step_id is None:  # 跳过无法映射的段落
+        for step_id_key, time_ranges in segments.items():
+            # step_id_key here is already an integer
+            if step_id_key is None: 
                 continue
                 
             total_duration = sum(end - start for start, end in time_ranges)
-            step_durations[step_id] = total_duration
+            step_durations[step_id_key] = total_duration
         
         return step_durations
     
     def calculate_actual_durations(self, step_to_audio_mapping: Dict[int, List[Dict]]) -> Dict[int, int]:
         """
         根据音频与步骤的映射计算每个步骤的实际音频持续时间。
+        改进版：处理跨步骤音频，分配全部音频时间，确保不会有音频被截断。
         
         Args:
             step_to_audio_mapping: 步骤ID到音频段落的映射
@@ -150,24 +200,117 @@ class TimingSynchronizer:
         Returns:
             Dict: 步骤ID到实际音频持续时间（取整到整数秒）的映射
         """
-        actual_durations = {}
+        if not self.content_json or not self.audio_metadata:
+            self.load_data()
         
-        for step_id, narrations in step_to_audio_mapping.items():
-            if not narrations:
-                # 如果没有对应的音频段落，保持原来的持续时间
-                for step in self.content_json["blackboard"]["steps"]:
-                    if step["step_id"] == step_id:
-                        actual_durations[step_id] = step["duration"]
-                        break
-                continue
-                
-            # 计算这个步骤的音频持续时间（取最后一个段落的结束时间减去第一个段落的开始时间）
-            start_time = min(narr["start_time"] for narr in narrations)
-            end_time = max(narr["end_time"] for narr in narrations)
-            duration = end_time - start_time
+        # 获取原始步骤持续时间，用于计算比例
+        original_durations = self.get_original_durations()
+        total_original_duration = sum(original_durations.values())
+        
+        # 获取总音频时长
+        total_audio_duration = self.calculate_total_audio_duration()
+        
+        # 创建音频段落到步骤的完整映射
+        segment_to_steps = []
+        for segment in self.audio_metadata:
+            start_time = segment["start_time"]
+            end_time = segment["end_time"]
+            start_step_id, end_step_id = self.map_time_to_step_id(start_time, end_time)
             
-            # 四舍五入到整数秒
-            actual_durations[step_id] = round(duration)
+            if start_step_id is not None:
+                segment_to_steps.append({
+                    "segment": segment,
+                    "start_step_id": start_step_id,
+                    "end_step_id": end_step_id
+                })
+            
+        # 计算每个步骤占用的音频时间
+        step_audio_times = {}
+        for step_id in original_durations:
+            step_audio_times[step_id] = []
+        
+        # 为每个步骤分配音频时间
+        for mapping in segment_to_steps:
+            segment = mapping["segment"]
+            start_step_id = mapping["start_step_id"]
+            end_step_id = mapping["end_step_id"]
+            
+            if start_step_id == end_step_id:
+                # 音频段落完全在一个步骤内
+                step_audio_times[start_step_id].append((segment["start_time"], segment["end_time"]))
+            else:
+                # 音频段落跨多个步骤，需要分配
+                current_time = segment["start_time"]
+                current_step_idx = self.content_json["blackboard"]["steps"].index(
+                    next(s for s in self.content_json["blackboard"]["steps"] if s["step_id"] == start_step_id)
+                )
+                
+                while current_step_idx < len(self.content_json["blackboard"]["steps"]):
+                    step = self.content_json["blackboard"]["steps"][current_step_idx]
+                    step_id = step["step_id"]
+                    
+                    # 找出当前步骤的时间范围
+                    step_start_time = 0
+                    for i in range(current_step_idx):
+                        step_start_time += self.content_json["blackboard"]["steps"][i]["duration"]
+                    step_end_time = step_start_time + step["duration"]
+                    
+                    # 计算这个步骤与音频段落的重叠部分
+                    overlap_start = max(current_time, step_start_time)
+                    if step_id == end_step_id:
+                        overlap_end = min(segment["end_time"], step_end_time)
+                    else:
+                        overlap_end = min(segment["end_time"], step_end_time)
+                    
+                    if overlap_end > overlap_start:
+                        step_audio_times[step_id].append((overlap_start, overlap_end))
+                        current_time = overlap_end
+                    
+                    if current_time >= segment["end_time"] or step_id == end_step_id:
+                        break
+                    
+                    current_step_idx += 1
+        
+        # 计算每个步骤的音频持续时间
+        actual_durations = {}
+        for step_id, time_ranges in step_audio_times.items():
+            if not time_ranges:
+                # 如果没有对应的音频段落，按比例分配总时长
+                original_duration = original_durations[step_id]
+                proportion = original_duration / total_original_duration
+                actual_durations[step_id] = max(1, round(total_audio_duration * proportion))
+                continue
+            
+            # 合并重叠的时间范围
+            time_ranges.sort()
+            merged_ranges = []
+            for time_range in time_ranges:
+                if not merged_ranges or time_range[0] > merged_ranges[-1][1]:
+                    merged_ranges.append(time_range)
+                else:
+                    merged_ranges[-1] = (merged_ranges[-1][0], max(merged_ranges[-1][1], time_range[1]))
+            
+            # 计算合并后的总时长
+            total_duration = sum(end - start for start, end in merged_ranges)
+            
+            # 最小持续时间为1秒
+            actual_durations[step_id] = max(1, round(total_duration))
+        
+        # 确保所有步骤的总持续时间不少于总音频时长
+        total_assigned_duration = sum(actual_durations.values())
+        if total_assigned_duration < total_audio_duration:
+            # 将剩余时间分配给最后一个步骤
+            last_step_id = self.content_json["blackboard"]["steps"][-1]["step_id"]
+            remaining_time = total_audio_duration - total_assigned_duration
+            actual_durations[last_step_id] += round(remaining_time)
+            logger.info(f"将剩余的 {remaining_time:.2f} 秒分配给最后一个步骤 {last_step_id}")
+        
+        # 记录音频分配详情
+        logger.info(f"音频总时长: {total_audio_duration:.2f} 秒")
+        logger.info(f"步骤分配时长: {sum(actual_durations.values())} 秒")
+        for step_id, duration in actual_durations.items():
+            original = original_durations.get(step_id, 0)
+            logger.info(f"步骤 {step_id}: 原时长 {original}秒, 新时长 {duration}秒, 时间范围: {step_audio_times.get(step_id, [])}")
         
         return actual_durations
     
