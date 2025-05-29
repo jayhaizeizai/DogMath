@@ -43,14 +43,14 @@ class TimingSynchronizer:
         
         original_durations = {}
         for step in self.content_json["blackboard"]["steps"]:
-            original_durations[step["step_id"]] = step["duration"]
+            original_durations[step["step_id"]] = step["duration"] # duration is likely int already
         
         return original_durations
     
     def create_step_audio_mapping(self) -> Dict[int, List[Dict]]:
         """
         创建黑板步骤和音频段落之间的映射关系。
-        基于实际音频元数据来确定每个步骤对应的音频段落。
+        (此方法在新逻辑中不直接用于时长计算，但保留以防其他部分依赖)
         """
         if not self.content_json or not self.audio_metadata:
             self.load_data()
@@ -100,13 +100,7 @@ class TimingSynchronizer:
     def map_time_to_step_id(self, start_time: float, end_time: float = None) -> Tuple[Optional[int], Optional[int]]:
         """
         将音频时间点或时间范围映射到对应的黑板步骤ID。
-        
-        Args:
-            start_time: 开始时间点（秒）
-            end_time: 结束时间点（秒），如果提供，将返回覆盖的所有步骤
-            
-        Returns:
-            Tuple[Optional[int], Optional[int]]: (开始步骤ID, 结束步骤ID)，如果没有匹配则返回(None, None)
+        (此方法在新逻辑中不直接用于时长计算，但保留以防其他部分依赖)
         """
         if not self.content_json:
             self.load_data()
@@ -152,9 +146,7 @@ class TimingSynchronizer:
     def get_actual_audio_durations(self) -> Dict[int, float]:
         """
         计算每个黑板步骤对应的实际音频持续时间。
-        
-        Returns:
-            Dict: 步骤ID到实际音频持续时间的映射
+        (此方法在新逻辑中不直接用于时长计算，将被新的 calculate_actual_durations 替代核心功能)
         """
         if not self.audio_metadata:
             self.load_data()
@@ -189,137 +181,159 @@ class TimingSynchronizer:
         
         return step_durations
     
-    def calculate_actual_durations(self, step_to_audio_mapping: Dict[int, List[Dict]]) -> Dict[int, int]:
+    def calculate_actual_durations(self) -> Dict[int, int]:
         """
-        根据音频与步骤的映射计算每个步骤的实际音频持续时间。
-        改进版：处理跨步骤音频，分配全部音频时间，确保不会有音频被截断。
-        
-        Args:
-            step_to_audio_mapping: 步骤ID到音频段落的映射
-            
+        计算每个黑板步骤的实际持续时间。
+        核心逻辑：
+        1. 确定每个理论旁白片段 (来自 content_json["audio"]["narration"]) 覆盖了哪些原始黑板步骤
+           (基于 content_json 中定义的理论时间)。
+        2. 获取每个理论旁白片段对应的实际音频时长 (来自 audio_metadata.json)。
+        3. 将该实际音频时长，按比例分配给被其理论上覆盖的黑板步骤。
+           比例依据是这些黑板步骤在理论旁白覆盖范围内的原始时长占比。
+        4. 一个黑板步骤的最终时长是其从所有相关旁白片段分配到的时长之和。
+
         Returns:
-            Dict: 步骤ID到实际音频持续时间（取整到整数秒）的映射
+            Dict: 步骤ID到实际音频持续时间（取整到整数秒，至少为1秒）的映射。
         """
         if not self.content_json or not self.audio_metadata:
             self.load_data()
+
+        blackboard_data = self.content_json.get("blackboard", {})
+        blackboard_steps_list = blackboard_data.get("steps", [])
+        audio_narration_list = self.content_json.get("audio", {}).get("narration", [])
+        actual_audio_segments_list = self.audio_metadata
+
+        if not blackboard_steps_list:
+            logger.warning("在 content_json 中未找到黑板步骤。无法计算实际时长。")
+            return {}
         
-        # 获取原始步骤持续时间，用于计算比例
-        original_durations = self.get_original_durations()
-        total_original_duration = sum(original_durations.values())
+        original_durations_map = self.get_original_durations() # For fallback
+
+        if not audio_narration_list:
+            logger.warning("在 content_json 的 audio.narration 中未找到旁白数据。将使用原始步骤时长。")
+            return original_durations_map
         
-        # 获取总音频时长
-        total_audio_duration = self.calculate_total_audio_duration()
+        if not actual_audio_segments_list:
+            logger.warning("在 audio_metadata 中未找到实际音频片段。将使用原始步骤时长。")
+            return original_durations_map
+
+        # 1. 计算原始黑板步骤的起止时间点 (基于理论时长)
+        original_step_timing_info = []
+        current_original_time = 0.0
+        for step_item in blackboard_steps_list:
+            step_id = step_item["step_id"]
+            # Ensure duration is float for calculations
+            original_duration = float(original_durations_map.get(step_id, 0.0)) 
+            original_step_timing_info.append({
+                "step_id": step_id,
+                "original_start_time": current_original_time,
+                "original_end_time": current_original_time + original_duration,
+                "original_duration": original_duration
+            })
+            current_original_time += original_duration
         
-        # 创建音频段落到步骤的完整映射
-        segment_to_steps = []
-        for segment in self.audio_metadata:
-            start_time = segment["start_time"]
-            end_time = segment["end_time"]
-            start_step_id, end_step_id = self.map_time_to_step_id(start_time, end_time)
-            
-            if start_step_id is not None:
-                segment_to_steps.append({
-                    "segment": segment,
-                    "start_step_id": start_step_id,
-                    "end_step_id": end_step_id
-                })
-            
-        # 计算每个步骤占用的音频时间
-        step_audio_times = {}
-        for step_id in original_durations:
-            step_audio_times[step_id] = []
-        
-        # 为每个步骤分配音频时间
-        for mapping in segment_to_steps:
-            segment = mapping["segment"]
-            start_step_id = mapping["start_step_id"]
-            end_step_id = mapping["end_step_id"]
-            
-            if start_step_id == end_step_id:
-                # 音频段落完全在一个步骤内
-                step_audio_times[start_step_id].append((segment["start_time"], segment["end_time"]))
-            else:
-                # 音频段落跨多个步骤，需要分配
-                current_time = segment["start_time"]
-                current_step_idx = self.content_json["blackboard"]["steps"].index(
-                    next(s for s in self.content_json["blackboard"]["steps"] if s["step_id"] == start_step_id)
-                )
-                
-                while current_step_idx < len(self.content_json["blackboard"]["steps"]):
-                    step = self.content_json["blackboard"]["steps"][current_step_idx]
-                    step_id = step["step_id"]
-                    
-                    # 找出当前步骤的时间范围
-                    step_start_time = 0
-                    for i in range(current_step_idx):
-                        step_start_time += self.content_json["blackboard"]["steps"][i]["duration"]
-                    step_end_time = step_start_time + step["duration"]
-                    
-                    # 计算这个步骤与音频段落的重叠部分
-                    overlap_start = max(current_time, step_start_time)
-                    if step_id == end_step_id:
-                        overlap_end = min(segment["end_time"], step_end_time)
-                    else:
-                        overlap_end = min(segment["end_time"], step_end_time)
-                    
-                    if overlap_end > overlap_start:
-                        step_audio_times[step_id].append((overlap_start, overlap_end))
-                        current_time = overlap_end
-                    
-                    if current_time >= segment["end_time"] or step_id == end_step_id:
-                        break
-                    
-                    current_step_idx += 1
-        
-        # 计算每个步骤的音频持续时间
-        actual_durations = {}
-        for step_id, time_ranges in step_audio_times.items():
-            if not time_ranges:
-                # 如果没有对应的音频段落，按比例分配总时长
-                original_duration = original_durations[step_id]
-                proportion = original_duration / total_original_duration
-                actual_durations[step_id] = max(1, round(total_audio_duration * proportion))
+        # 初始化新的步骤时长累加器 (使用浮点数进行中间计算)
+        accumulated_new_step_durations_float = {step["step_id"]: 0.0 for step in blackboard_steps_list}
+
+        # 2. 遍历理论旁白片段 (来自 content_json)
+        num_narrations = len(audio_narration_list)
+        num_actual_segments = len(actual_audio_segments_list)
+
+        for i in range(num_narrations):
+            if i >= num_actual_segments:
+                logger.warning(f"理论旁白片段 {i} 没有在 audio_metadata.json 中找到对应的实际音频片段。跳过此旁白。")
+                continue
+
+            narration_item = audio_narration_list[i]
+            actual_audio_segment = actual_audio_segments_list[i] # 假设索引一一对应
+
+            try:
+                # 理论旁白的时间范围
+                narr_theoretical_start = float(narration_item["start_time"])
+                narr_theoretical_end = float(narration_item["end_time"])
+                # 此理论旁白对应的实际总音频时长
+                actual_total_duration_for_this_narration = float(actual_audio_segment["duration"])
+            except (TypeError, ValueError) as e:
+                logger.warning(f"解析旁白 {i} 或其对应实际音频片段的时长/时间时出错: {e}。跳过此旁白。")
+                continue
+
+            if actual_total_duration_for_this_narration <= 0:
+                logger.info(f"旁白 {i} 对应的实际音频时长为零或负 ({actual_total_duration_for_this_narration}s)。跳过分配。")
                 continue
             
-            # 合并重叠的时间范围
-            time_ranges.sort()
-            merged_ranges = []
-            for time_range in time_ranges:
-                if not merged_ranges or time_range[0] > merged_ranges[-1][1]:
-                    merged_ranges.append(time_range)
-                else:
-                    merged_ranges[-1] = (merged_ranges[-1][0], max(merged_ranges[-1][1], time_range[1]))
+            if narr_theoretical_end <= narr_theoretical_start:
+                logger.info(f"旁白 {i} 的理论结束时间 ({narr_theoretical_end}s) 不大于理论开始时间 ({narr_theoretical_start}s)。跳过分配。")
+                continue
+
+            # 3. 找出此理论旁白覆盖了哪些原始黑板步骤，并计算它们在此旁白理论范围内的原始时长贡献
+            steps_covered_by_this_narration = []
+            total_original_duration_of_steps_in_narration_span = 0.0
+
+            for step_info in original_step_timing_info:
+                # 计算理论旁白时间范围与原始步骤时间范围的重叠部分
+                overlap_start = max(step_info["original_start_time"], narr_theoretical_start)
+                overlap_end = min(step_info["original_end_time"], narr_theoretical_end)
+                
+                original_duration_of_step_in_narration_span = 0.0
+                if overlap_end > overlap_start: # 确保有有效重叠
+                    original_duration_of_step_in_narration_span = overlap_end - overlap_start
+                
+                if original_duration_of_step_in_narration_span > 1e-6: # 避免浮点数误差导致极小正值
+                    steps_covered_by_this_narration.append({
+                        "step_id": step_info["step_id"],
+                        "original_contribution_in_span": original_duration_of_step_in_narration_span
+                    })
+                    total_original_duration_of_steps_in_narration_span += original_duration_of_step_in_narration_span
             
-            # 计算合并后的总时长
-            total_duration = sum(end - start for start, end in merged_ranges)
+            if not steps_covered_by_this_narration:
+                logger.info(f"旁白 {i} (理论时间 {narr_theoretical_start:.2f}s-{narr_theoretical_end:.2f}s) "
+                               f"未覆盖任何原始黑板步骤。其总实际音频时长 {actual_total_duration_for_this_narration:.2f}s 无法分配。")
+                continue
             
-            # 最小持续时间为1秒
-            actual_durations[step_id] = max(1, round(total_duration))
+            if total_original_duration_of_steps_in_narration_span <= 1e-6: # 避免除零
+                logger.warning(f"旁白 {i} 覆盖的步骤在其理论时间范围内的总原始时长贡献过小或为零 "
+                               f"({total_original_duration_of_steps_in_narration_span:.2f}s)。无法按比例分配实际时长 "
+                               f"{actual_total_duration_for_this_narration:.2f}s。")
+                # 可选：如果只覆盖一个步骤，可以将全部时长给它
+                if len(steps_covered_by_this_narration) == 1:
+                    only_covered_step_id = steps_covered_by_this_narration[0]["step_id"]
+                    accumulated_new_step_durations_float[only_covered_step_id] += actual_total_duration_for_this_narration
+                    logger.info(f"  由于上述警告，但仅覆盖一个步骤 {only_covered_step_id}，已将全部实际时长分配给它。")
+                continue
+
+            # 4. 按比例分配此旁白的实际总时长给覆盖到的步骤
+            for covered_step in steps_covered_by_this_narration:
+                step_id_to_update = covered_step["step_id"]
+                original_contribution = covered_step["original_contribution_in_span"]
+                
+                proportion = original_contribution / total_original_duration_of_steps_in_narration_span
+                distributed_duration_for_step = actual_total_duration_for_this_narration * proportion
+                
+                accumulated_new_step_durations_float[step_id_to_update] += distributed_duration_for_step
+                logger.debug(f"  步骤 {step_id_to_update}: 从旁白 {i} 分配到 {distributed_duration_for_step:.2f}s "
+                            f"(原始贡献: {original_contribution:.2f}s / 总原始贡献: {total_original_duration_of_steps_in_narration_span:.2f}s, "
+                            f"旁白总实际时长: {actual_total_duration_for_this_narration:.2f}s)")
+
+        # 5. 完成所有旁白处理后，整理最终的步骤时长 (四舍五入，确保最小为1秒)
+        final_actual_durations_map = {}
+        for step_id, calculated_total_duration_float in accumulated_new_step_durations_float.items():
+            if calculated_total_duration_float <= 1e-6: # 如果步骤未从任何旁白分配到时长
+                original_step_duration = float(original_durations_map.get(step_id, 1.0)) # 使用原始时长或至少1秒
+                final_actual_durations_map[step_id] = max(1, round(original_step_duration))
+                logger.info(f"步骤 {step_id} 未从任何旁白分配到有效时长。使用其原始时长 {original_step_duration:.2f}s, "
+                               f"调整为 {final_actual_durations_map[step_id]}s。")
+            else:
+                final_actual_durations_map[step_id] = max(1, round(calculated_total_duration_float))
         
-        # 确保所有步骤的总持续时间不少于总音频时长
-        total_assigned_duration = sum(actual_durations.values())
-        if total_assigned_duration < total_audio_duration:
-            # 将剩余时间分配给最后一个步骤
-            last_step_id = self.content_json["blackboard"]["steps"][-1]["step_id"]
-            remaining_time = total_audio_duration - total_assigned_duration
-            actual_durations[last_step_id] += round(remaining_time)
-            logger.info(f"将剩余的 {remaining_time:.2f} 秒分配给最后一个步骤 {last_step_id}")
-        
-        # 记录音频分配详情
-        logger.info(f"音频总时长: {total_audio_duration:.2f} 秒")
-        logger.info(f"步骤分配时长: {sum(actual_durations.values())} 秒")
-        for step_id, duration in actual_durations.items():
-            original = original_durations.get(step_id, 0)
-            logger.info(f"步骤 {step_id}: 原时长 {original}秒, 新时长 {duration}秒, 时间范围: {step_audio_times.get(step_id, [])}")
-        
-        return actual_durations
+        total_adjusted_blackboard_duration = sum(final_actual_durations_map.values())
+        logger.info(f"所有黑板步骤调整后的总时长为: {total_adjusted_blackboard_duration}s。")
+        logger.info(f"各步骤最终调整后时长: {final_actual_durations_map}")
+
+        return final_actual_durations_map
     
     def adjust_step_durations(self, actual_durations: Dict[int, int]) -> None:
         """
         根据实际音频持续时间调整黑板步骤的持续时间。
-        
-        Args:
-            actual_durations: 步骤ID到实际持续时间的映射
         """
         if not self.content_json:
             self.load_data()
@@ -359,24 +373,14 @@ class TimingSynchronizer:
                             
                 logger.info(f"步骤 {step_id} 的动画时间已按比例 {scale_factor:.2f} 调整")
     
-    def analyze_timing_differences(self) -> Dict:
+    def analyze_timing_differences(self, original_durations: Dict[int, int], adjusted_durations: Dict[int, int]) -> Dict:
         """
-        分析音频和黑板动画的时间差异
-        
-        Returns:
-            Dict: 时间差异分析结果
+        分析音频和黑板动画的时间差异, 基于已提供的原始和调整后的时长。
         """
-        if not self.content_json or not self.audio_metadata:
-            self.load_data()
-            
-        original_durations = self.get_original_durations()
-        step_to_audio = self.create_step_audio_mapping()
-        actual_durations = self.calculate_actual_durations(step_to_audio)
-        
         differences = {}
         for step_id in original_durations:
             original = original_durations[step_id]
-            actual = actual_durations.get(step_id, original)
+            actual = adjusted_durations.get(step_id, original)
             diff = actual - original
             diff_percent = (diff / original) * 100 if original > 0 else 0
             
@@ -388,7 +392,7 @@ class TimingSynchronizer:
             }
             
         total_original = sum(original_durations.values())
-        total_actual = sum(actual_durations.values())
+        total_actual = sum(adjusted_durations.values())
         
         return {
             "step_differences": differences,
@@ -455,25 +459,28 @@ class TimingSynchronizer:
     def synchronize(self, output_path: str = None) -> Dict:
         """
         执行完整的同步过程并返回结果摘要。
-        
-        Args:
-            output_path: 输出文件路径，如果为None则生成默认路径
-            
-        Returns:
-            Dict: 同步结果摘要
+        采用基于理论时间映射和实际音频时长比例分配的方式调整步骤时长。
         """
         # 加载数据
         self.load_data()
         
-        # 分析音频段落与黑板步骤的对应关系
-        step_to_audio_mapping = self.create_step_audio_mapping()
+        # 计算每个步骤的实际音频持续时间 (采用新的精确映射逻辑)
+        actual_step_durations = self.calculate_actual_durations()
         
-        # 计算每个步骤的实际音频持续时间
-        actual_step_durations = self.calculate_actual_durations(step_to_audio_mapping)
-        
-        # 获取原始持续时间（用于比较）
-        original_durations = self.get_original_durations()
-        
+        # 获取原始持续时间（用于比较和分析）
+        # get_original_durations 返回的是 Dict[int, int]
+        original_durations : Dict[int, int] = {k: int(v) for k,v in self.get_original_durations().items()}
+
+        if not actual_step_durations: # 如果计算失败，则不进行后续调整
+             logger.error("未能计算出有效的实际步骤时长，同步中止。")
+             return {
+                "error": "Failed to calculate actual step durations.",
+                "original_durations": original_durations,
+                "adjusted_durations": {},
+                "total_audio_duration": self.calculate_total_audio_duration(),
+                "total_blackboard_duration": self.calculate_total_blackboard_duration(), # Should be original if no adjustment
+             }
+
         # 调整黑板步骤的持续时间
         self.adjust_step_durations(actual_step_durations)
         
@@ -483,12 +490,14 @@ class TimingSynchronizer:
         # 保存调整后的内容
         saved_path = self.save_adjusted_content(output_path)
         
+        timing_analysis = self.analyze_timing_differences(original_durations, actual_step_durations)
+        
         # 返回同步结果摘要
         return {
             "original_durations": original_durations,
             "adjusted_durations": actual_step_durations,
             "total_audio_duration": self.calculate_total_audio_duration(),
-            "total_blackboard_duration": self.calculate_total_blackboard_duration(),
+            "total_blackboard_duration": self.calculate_total_blackboard_duration(), # 从调整后的 content_json 计算
             "saved_to": saved_path,
-            "timing_analysis": self.analyze_timing_differences()
+            "timing_analysis": timing_analysis
         } 
