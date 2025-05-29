@@ -75,6 +75,7 @@ class BlackboardVideoGenerator:
         取二者里更严格的缩放因子，等比缩小元素 & 行间距。
         """
         safe = step.get("safe_zone") or {}
+        safe_left   = safe.get("left", 0.05) 
         safe_top    = safe.get("top", 0.05)
         safe_bottom = max(safe.get("bottom", MIN_BOTTOM_SAFE), MIN_BOTTOM_SAFE)
         safe_right  = safe.get("right", 0.40)
@@ -84,26 +85,63 @@ class BlackboardVideoGenerator:
         elems   = step.get("elements", [])
 
         # ---------- ① 纵向约束 ----------
-        total_h_ratio = sum(el["size"][1] for el in elems) \
-                        + v_space * (len(elems) - 1)
-        avail_h_ratio = 1.0 - safe_top - safe_bottom
-        scale_v = avail_h_ratio / total_h_ratio if total_h_ratio > 0 else 1.0
-
+        valid_elems_for_h_ratio = [el for el in elems if "size" in el and isinstance(el["size"], tuple) and len(el["size"]) == 2]
+        if not valid_elems_for_h_ratio and elems:
+             self.logger.warning(f"Step {step.get('step_id', 'N/A')}: No valid element sizes found for vertical scaling. Skipping vertical scaling constraint.")
+             scale_v = 1.0
+        elif not valid_elems_for_h_ratio:
+            scale_v = 1.0
+        else:
+            total_h_ratio = sum(el["size"][1] for el in valid_elems_for_h_ratio) \
+                            + v_space * (len(valid_elems_for_h_ratio) - 1 if len(valid_elems_for_h_ratio) > 1 else 0)
+            avail_h_ratio = 1.0 - safe_top - safe_bottom
+            if avail_h_ratio <= 0:
+                self.logger.warning(f"Step {step.get('step_id', 'N/A')}: Available height ratio non-positive ({avail_h_ratio:.3f}). Using scale_v=1.0.")
+                scale_v = 1.0
+            elif total_h_ratio > 0:
+                scale_v = avail_h_ratio / total_h_ratio
+            else:
+                scale_v = 1.0
+        
         # ---------- ② 横向约束 ----------
-        max_w_ratio   = max(el["size"][0] for el in elems) if elems else 0.0
-        avail_w_ratio = 1.0 - safe_right
-        scale_h = avail_w_ratio / max_w_ratio if max_w_ratio > 0 else 1.0
+        valid_elems_for_w_ratio = [el for el in elems if "size" in el and isinstance(el["size"], tuple) and len(el["size"]) == 2]
+        if not valid_elems_for_w_ratio and elems:
+            max_w_ratio = 0.0 # Or handle as error/warning
+            self.logger.warning(f"Step {step.get('step_id', 'N/A')}: No valid element sizes found for horizontal scaling. Skipping horizontal scaling constraint.")
+            scale_h = 1.0
+        elif not valid_elems_for_w_ratio: # No elements
+            max_w_ratio = 0.0
+            scale_h = 1.0
+        else:
+            max_w_ratio = max(el["size"][0] for el in valid_elems_for_w_ratio) if valid_elems_for_w_ratio else 0.0
+            
+        avail_w_ratio = 1.0 - safe_left - safe_right
+        if avail_w_ratio <= 0:
+            self.logger.warning(f"Step {step.get('step_id', 'N/A')}: Available width ratio non-positive ({avail_w_ratio:.3f}). Using scale_h=1.0.")
+            scale_h = 1.0
+        elif max_w_ratio > 0:
+            scale_h = avail_w_ratio / max_w_ratio
+        else:
+            scale_h = 1.0
+        
+        scale_v = max(0.001, scale_v) 
+        scale_h = max(0.001, scale_h)
 
-        # ---------- ③ 取两者最小值 ----------
         scale = min(scale_v, scale_h, 1.0)
-        if scale >= 1.0:    # 不需要缩放
+        if scale >= 1.0:    
+            for el in elems: # Ensure image and size keys exist
+                if "image" not in el: el["image"] = np.zeros((1,1,3), dtype=np.uint8)
+                if "size" not in el: el["size"] = (0.0, 0.0)
             return
 
-        # 同步缩放行间距
         step["vertical_spacing"] = v_space * scale
 
-        # 缩小像素 & ratio 尺寸
         for el in elems:
+            if "image" not in el or "size" not in el : # Should have been set by now
+                 self.logger.warning(f"Step {step.get('step_id', 'N/A')}, Element: Missing 'image' or 'size' during scaling. Element might not be rendered correctly.")
+                 if "image" not in el: el["image"] = np.zeros((1,1,3), dtype=np.uint8) # Placeholder
+                 if "size" not in el: el["size"] = (0.0,0.0) # Placeholder
+
             img = el["image"]
             h,  w = img.shape[:2]
             new_w, new_h = max(1, int(w * scale)), max(1, int(h * scale))
@@ -113,39 +151,61 @@ class BlackboardVideoGenerator:
 
         if self.debug:
             self.logger.info(
-                f"Step {step.get('step_id')} 自动缩放: scale_v={scale_v:.3f}, "
+                f"Step {step.get('step_id', 'N/A')} 自动缩放: scale_v={scale_v:.3f}, "
                 f"scale_h={scale_h:.3f}, 使用={scale:.3f}"
             )
 
     def _auto_vertical_stack(self, step: dict) -> None:
         """
         把 center 定义在可见内容区：
-            左 = 0，右 = 1 - safe_right
+            左 = safe_left，右 = 1 - safe_right
         无论 text / formula / geometry 都水平居中摆放；
-        有显式 'position' 的，只保留用户给的 x。
+        有显式 'position' 的，用户给的 x 被解释为相对于安全区。
         """
         safe  = step.get('safe_zone') or {}
+        safe_left   = safe.get('left', 0.05)       
         safe_top    = safe.get('top', 0.05)
         safe_bottom = max(safe.get('bottom', MIN_BOTTOM_SAFE), MIN_BOTTOM_SAFE)
         safe_right  = safe.get('right', 0.40)
 
-        avail_width_center = (1.0 - safe_right) / 2      # 内容区中心
+        safe_area_w = 1.0 - safe_left - safe_right
+        step_id_for_log = step.get('step_id', 'N/A')
+        
+        content_area_horizontal_center: float
+        if safe_area_w <= 0:
+            self.logger.warning(
+                f"Step {step_id_for_log} in _auto_vertical_stack: "
+                f"Safe area width is non-positive ({safe_area_w:.3f}). "
+                f"Elements will be centered globally for X (0.5)."
+            )
+            content_area_horizontal_center = 0.5 
+        else:
+            content_area_horizontal_center = safe_left + safe_area_w / 2
+
         vertical_spacing_val = step.get("vertical_spacing")
         v_space = vertical_spacing_val if vertical_spacing_val is not None else 0.02
 
-        y_cursor = safe_top
-        for el in step['elements']:
-            w_ratio, h_ratio = el['size']
+        y_cursor = safe_top 
+        for el in step.get('elements', []):
+            if "size" not in el or not isinstance(el["size"], tuple) or len(el["size"]) != 2:
+                self.logger.warning(f"Step {step_id_for_log}, Element type {el.get('type', 'Unknown')}: Skipping in _auto_vertical_stack due to missing or invalid 'size'.")
+                continue
 
-            # -------- X 方向 ----------
-            if el.get('position'):                       # 用户手动给 x
-                current_x = el['position'][0]
-            else:
-                current_x = avail_width_center           # 全部水平居中
+            _w_ratio, h_ratio = el['size'] 
 
-            # -------- Y 方向 ----------
-            anchor_y = y_cursor + h_ratio / 2
-            el['position'] = [current_x, anchor_y]
+            current_x_global: float
+            if el.get('position') and el['position'][0] is not None:
+                json_rel_x = el['position'][0] 
+                if safe_area_w <= 0: 
+                    current_x_global = 0.5 
+                    self.logger.warning(f"Step {step_id_for_log}, Element type {el.get('type', 'Unknown')}: Using global center X due to non-positive safe_area_w in _auto_vertical_stack with provided relative X.")
+                else:
+                    current_x_global = safe_left + json_rel_x * safe_area_w
+            else: 
+                current_x_global = content_area_horizontal_center
+            
+            anchor_y_global = y_cursor + h_ratio / 2
+            el['position'] = [current_x_global, anchor_y_global] 
 
             y_cursor += h_ratio + v_space
 
@@ -160,124 +220,168 @@ class BlackboardVideoGenerator:
             临时视频文件路径
         """
         try:
-            # 获取步骤列表
-            steps = blackboard_data.get('steps', [])
-            if not steps:
+            input_steps = blackboard_data.get('steps', [])
+            if not input_steps:
                 self.logger.error("未找到步骤数据")
                 return ""
                 
-            # 处理每个步骤
-            for step in steps:
-                # 处理每个元素
-                for element in step.get('elements', []):
-                    # 渲染元素并缓存尺寸
+            processed_steps = []
+
+            for step_data in input_steps:
+                current_step = {key: value for key, value in step_data.items()} # Deepcopy if complex, shallow for dicts of primitives
+                elements_in_step_data = current_step.get('elements', [])
+                current_step['elements'] = [{key: value for key, value in el.items()} for el in elements_in_step_data]
+
+
+                step_id_for_log = current_step.get('step_id', 'N/A')
+
+                safe_settings = current_step.get("safe_zone") or {}
+                s_top = safe_settings.get("top", 0.05)
+                s_bottom = max(safe_settings.get("bottom", MIN_BOTTOM_SAFE), MIN_BOTTOM_SAFE)
+                s_right = safe_settings.get("right", 0.40)
+                s_left = safe_settings.get("left", 0.05) 
+
+                safe_area_w = 1.0 - s_left - s_right
+                safe_area_h = 1.0 - s_top - s_bottom
+
+                if safe_area_w <= 0:
+                    self.logger.warning(f"Step {step_id_for_log}: Safe area width non-positive ({safe_area_w:.3f}). Positioning may be affected.")
+                if safe_area_h <= 0:
+                    self.logger.warning(f"Step {step_id_for_log}: Safe area height non-positive ({safe_area_h:.3f}). Positioning may be affected.")
+
+                temp_processed_elements = []
+                for element_data in current_step.get('elements', []):
+                    element = element_data # Already a copy
+                    img = None
                     if element['type'] == 'formula':
                         img = render_formula(element['content'], element.get('font_size', 32), self.debug)
                     elif element['type'] == 'text':
                         img = render_text(element['content'], element.get('font_size', 32), self.debug)
                     elif element['type'] == 'geometry':
                         img = render_geometry(element['content'], scale_factor=element.get('scale', 1.0), debug=self.debug)
-                    else:
-                        continue
-                        
-                    # 修改：缓存元素的真实尺寸
-                    h_ratio = img.shape[0] / self.height
-                    w_ratio = img.shape[1] / self.width
-                    element['size'] = (w_ratio, h_ratio)
-                    # 保存原始图像供后续使用
-                    element['image'] = img
-                
-                # 应用内容缩放确保所有内容符合安全区
-                self._scale_step_content(step)
-                
-                # 如果配置了自动垂直堆叠，则应用
-                if step.get('layout') == 'vertical-stack':
-                    self._auto_vertical_stack(step)
                     
-            # 获取视频参数
+                    if img is None:
+                        element['image'] = np.zeros((1,1,4), dtype=np.uint8) # Use 4 channels for alpha
+                        element['size'] = (0.0, 0.0)
+                        self.logger.warning(f"Step {step_id_for_log}, Element type {element.get('type')}: Failed to render. Using placeholder image.")
+                    else:
+                        element['image'] = img # This is BGRA from renderers
+                        h_ratio = img.shape[0] / self.height
+                        w_ratio = img.shape[1] / self.width
+                        element['size'] = (w_ratio, h_ratio)
+                    temp_processed_elements.append(element)
+                current_step['elements'] = temp_processed_elements
+                
+                self._scale_step_content(current_step)
+                
+                is_vertical_stack_layout = current_step.get('layout') == 'vertical-stack'
+
+                if is_vertical_stack_layout:
+                    self._auto_vertical_stack(current_step)
+                else:
+                    for element in current_step.get('elements', []):
+                        element_type_for_log = element.get('type', 'Unknown')
+                        if element.get('position'): 
+                            json_pos_x = element['position'][0]
+                            json_pos_y = element['position'][1]
+                            
+                            global_center_x = 0.5 # Default global center X
+                            global_center_y = 0.5 # Default global center Y
+
+                            if safe_area_w > 0:
+                                global_center_x = s_left + json_pos_x * safe_area_w
+                            else:
+                                self.logger.warning(f"Step {step_id_for_log}, Element {element_type_for_log}: Using global center X due to non-positive safe_area_w for non-vertical_stack.")
+                            
+                            if safe_area_h > 0:
+                                global_center_y = s_top + json_pos_y * safe_area_h
+                            else:
+                                self.logger.warning(f"Step {step_id_for_log}, Element {element_type_for_log}: Using global center Y due to non-positive safe_area_h for non-vertical_stack.")
+                                
+                            element['position'] = [global_center_x, global_center_y]
+                        else:
+                            default_x = 0.5
+                            default_y = 0.5
+                            if safe_area_w > 0: default_x = s_left + 0.5 * safe_area_w
+                            if safe_area_h > 0: default_y = s_top + 0.5 * safe_area_h
+                            element['position'] = [default_x, default_y]
+                            self.logger.info(
+                                f"Step {step_id_for_log}, Element {element_type_for_log}: "
+                                f"No 'position' in JSON for non-vertical-stack. Defaulting to global {element['position']} (safe area center if valid)."
+                            )
+                processed_steps.append(current_step)
+                            
             width = blackboard_data.get('resolution', [self.width, self.height])[0]
             height = blackboard_data.get('resolution', [self.width, self.height])[1]
-            fps = 30  # 默认帧率
+            fps = 30  
             
-            # 创建临时输出路径
-            temp_output = "backend/output/temp_blackboard.mp4"
+            temp_output_dir = "backend/output"
+            if not os.path.exists(temp_output_dir):
+                os.makedirs(temp_output_dir)
+            temp_output = os.path.join(temp_output_dir, f"temp_blackboard_{int(time.time())}.mp4")
             
-            # 创建视频写入器
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             video_writer = cv2.VideoWriter(temp_output, fourcc, fps, (width, height))
             
-            # 创建黑板背景
             background = create_blackboard_background(width, height)
             
-            # 在创建timeline之前，识别几何元素和文本标签
-            for step in blackboard_data['steps']:
+            for step in processed_steps:
                 geometry_elements = []
                 text_elements = []
+                step_id_for_log = step.get('step_id', 'N/A')
                 
-                for element in step['elements']:
+                for element in step.get('elements', []):
                     if element['type'] == 'geometry':
                         geometry_elements.append(element)
-                    elif element['type'] == 'text' and element['content'] in ['O', 'A', 'B', 'C']:
+                    elif element['type'] == 'text' and element.get('content','') in ['O', 'A', 'B', 'C']: # Check content exists
                         text_elements.append(element)
                 
-                # 如果同时存在几何图形和字母标签，确保它们的位置匹配
                 if geometry_elements and text_elements:
-                    self.logger.info("检测到几何图形和文本标签，调整位置以确保匹配")
-                    
-                    # 具体的调整逻辑
-                    # 例如，可以根据几何图形的大小和位置调整文本标签的位置
+                    self.logger.info(f"Step {step_id_for_log}: 检测到几何图形和文本标签，调整位置以确保匹配 (此部分逻辑未实现)")
             
-            # 处理每个步骤
-            for step in blackboard_data['steps']:
-                # 计算总帧数
-                total_frames = int(step['duration'] * fps)
-                
-                # 创建时间线
+            for step in processed_steps:
+                total_frames = int(step.get('duration',0) * fps) # Ensure duration exists
+                step_id_for_log = step.get('step_id', 'N/A')
                 timeline = []
                 
-                # 处理每个元素
-                for element in step['elements']:
-                    element_type = element['type']
+                for element in step.get('elements', []):
+                    element_type = element.get('type', 'unknown')
                     
-                    # ✦✦ 新：直接取缓存的缩放后 bitmap ✦✦
-                    content = element['image']          # 已经 resize 过
-                    if content is None:
-                        # 理论上不会走到这里，兜底
-                        if element_type == 'text':
-                            content = render_text(element['content'], element.get('font_size', 32), self.debug)
-                        elif element_type == 'formula':
-                            content = render_formula(element['content'], element.get('font_size', 32), self.debug)
-                        elif element_type == 'geometry':
-                            content = render_geometry(element['content'], scale_factor=element.get('scale', 1.0), debug=self.debug)
+                    content = element.get('image') # Should be scaled BGRA image
                     
-                    if content is not None:
-                        # 处理动画配置
-                        animation = element.get('animation', {})
-                        fade_in_frames = 0
-                        fade_out_frames = 0
-                        
-                        if animation:
-                            fade_duration = animation.get('duration', 1.0)
-                            fade_in_frames = int(fade_duration * fps)
-                            if 'exit' in animation:
-                                fade_out_frames = int(fade_duration * fps)
-                        
-                        # 添加到时间线
-                        timeline.append({
-                            'type': element_type,
-                            'content': content,
-                            'position': element['position'],
-                            'start_frame': 0,
-                            'end_frame': total_frames - fade_out_frames if fade_out_frames > 0 else total_frames,
-                            'fade_in_frames': fade_in_frames,
-                            'fade_out_frames': fade_out_frames,
-                            'z_index': get_z_index(element_type)
-                        })
+                    if content is None or not isinstance(content, np.ndarray) or content.size == 0 :
+                        self.logger.warning(f"Step {step_id_for_log}, Element {element_type}: Content image is missing or invalid. Skipping element in timeline.")
+                        continue
+
+                    # Position should be global by now
+                    position = element.get('position')
+                    if position is None or len(position) != 2:
+                        self.logger.warning(f"Step {step_id_for_log}, Element {element_type}: Position is missing or invalid. Defaulting to [0.5, 0.5].")
+                        position = [0.5, 0.5] # Default global center
+                    
+                    animation = element.get('animation', {})
+                    fade_in_frames = 0
+                    fade_out_frames = 0
+                    
+                    if animation and isinstance(animation, dict): # Check animation is a dict
+                        fade_duration = animation.get('duration', 1.0)
+                        fade_in_frames = int(fade_duration * fps)
+                        if 'exit' in animation: # Check key existence
+                            fade_out_frames = int(fade_duration * fps)
+                    
+                    timeline.append({
+                        'type': element_type,
+                        'content': content, # This is an image
+                        'position': position,
+                        'start_frame': 0, # Simplified start/end for now
+                        'end_frame': total_frames - fade_out_frames if fade_out_frames > 0 else total_frames,
+                        'fade_in_frames': fade_in_frames,
+                        'fade_out_frames': fade_out_frames,
+                        'z_index': get_z_index(element_type)
+                    })
                 
-                # 按z_index排序时间线元素
                 timeline.sort(key=lambda x: x['z_index'])
                 
-                # 生成帧
                 for frame_idx in range(total_frames):
                     # 复制背景
                     frame = background.copy()
