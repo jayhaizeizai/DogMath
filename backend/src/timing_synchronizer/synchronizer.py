@@ -181,7 +181,7 @@ class TimingSynchronizer:
         
         return step_durations
     
-    def calculate_actual_durations(self) -> Dict[int, int]:
+    def calculate_actual_durations(self) -> Dict[int, float]:
         """
         计算每个黑板步骤的实际持续时间。
         核心逻辑：
@@ -193,7 +193,7 @@ class TimingSynchronizer:
         4. 一个黑板步骤的最终时长是其从所有相关旁白片段分配到的时长之和。
 
         Returns:
-            Dict: 步骤ID到实际音频持续时间（取整到整数秒，至少为1秒）的映射。
+            Dict: 步骤ID到实际音频持续时间（浮点数，至少为0.1秒，保留3位小数）的映射。
         """
         if not self.content_json or not self.audio_metadata:
             self.load_data()
@@ -207,7 +207,7 @@ class TimingSynchronizer:
             logger.warning("在 content_json 中未找到黑板步骤。无法计算实际时长。")
             return {}
         
-        original_durations_map = self.get_original_durations() # For fallback
+        original_durations_map = {k: float(v) for k, v in self.get_original_durations().items()}
 
         if not audio_narration_list:
             logger.warning("在 content_json 的 audio.narration 中未找到旁白数据。将使用原始步骤时长。")
@@ -217,12 +217,10 @@ class TimingSynchronizer:
             logger.warning("在 audio_metadata 中未找到实际音频片段。将使用原始步骤时长。")
             return original_durations_map
 
-        # 1. 计算原始黑板步骤的起止时间点 (基于理论时长)
         original_step_timing_info = []
         current_original_time = 0.0
         for step_item in blackboard_steps_list:
             step_id = step_item["step_id"]
-            # Ensure duration is float for calculations
             original_duration = float(original_durations_map.get(step_id, 0.0)) 
             original_step_timing_info.append({
                 "step_id": step_id,
@@ -232,10 +230,8 @@ class TimingSynchronizer:
             })
             current_original_time += original_duration
         
-        # 初始化新的步骤时长累加器 (使用浮点数进行中间计算)
         accumulated_new_step_durations_float = {step["step_id"]: 0.0 for step in blackboard_steps_list}
 
-        # 2. 遍历理论旁白片段 (来自 content_json)
         num_narrations = len(audio_narration_list)
         num_actual_segments = len(actual_audio_segments_list)
 
@@ -245,40 +241,36 @@ class TimingSynchronizer:
                 continue
 
             narration_item = audio_narration_list[i]
-            actual_audio_segment = actual_audio_segments_list[i] # 假设索引一一对应
+            actual_audio_segment = actual_audio_segments_list[i] 
 
             try:
-                # 理论旁白的时间范围
                 narr_theoretical_start = float(narration_item["start_time"])
                 narr_theoretical_end = float(narration_item["end_time"])
-                # 此理论旁白对应的实际总音频时长
                 actual_total_duration_for_this_narration = float(actual_audio_segment["duration"])
             except (TypeError, ValueError) as e:
                 logger.warning(f"解析旁白 {i} 或其对应实际音频片段的时长/时间时出错: {e}。跳过此旁白。")
                 continue
 
-            if actual_total_duration_for_this_narration <= 0:
-                logger.info(f"旁白 {i} 对应的实际音频时长为零或负 ({actual_total_duration_for_this_narration}s)。跳过分配。")
+            if actual_total_duration_for_this_narration <= 1e-6: # Use a small epsilon for float comparison
+                logger.info(f"旁白 {i} 对应的实际音频时长过小 ({actual_total_duration_for_this_narration:.3f}s)。跳过分配。")
                 continue
             
             if narr_theoretical_end <= narr_theoretical_start:
-                logger.info(f"旁白 {i} 的理论结束时间 ({narr_theoretical_end}s) 不大于理论开始时间 ({narr_theoretical_start}s)。跳过分配。")
+                logger.info(f"旁白 {i} 的理论结束时间 ({narr_theoretical_end:.2f}s) 不大于理论开始时间 ({narr_theoretical_start:.2f}s)。跳过分配。")
                 continue
 
-            # 3. 找出此理论旁白覆盖了哪些原始黑板步骤，并计算它们在此旁白理论范围内的原始时长贡献
             steps_covered_by_this_narration = []
             total_original_duration_of_steps_in_narration_span = 0.0
 
             for step_info in original_step_timing_info:
-                # 计算理论旁白时间范围与原始步骤时间范围的重叠部分
                 overlap_start = max(step_info["original_start_time"], narr_theoretical_start)
                 overlap_end = min(step_info["original_end_time"], narr_theoretical_end)
                 
                 original_duration_of_step_in_narration_span = 0.0
-                if overlap_end > overlap_start: # 确保有有效重叠
+                if overlap_end > overlap_start: 
                     original_duration_of_step_in_narration_span = overlap_end - overlap_start
                 
-                if original_duration_of_step_in_narration_span > 1e-6: # 避免浮点数误差导致极小正值
+                if original_duration_of_step_in_narration_span > 1e-6: 
                     steps_covered_by_this_narration.append({
                         "step_id": step_info["step_id"],
                         "original_contribution_in_span": original_duration_of_step_in_narration_span
@@ -287,21 +279,19 @@ class TimingSynchronizer:
             
             if not steps_covered_by_this_narration:
                 logger.info(f"旁白 {i} (理论时间 {narr_theoretical_start:.2f}s-{narr_theoretical_end:.2f}s) "
-                               f"未覆盖任何原始黑板步骤。其总实际音频时长 {actual_total_duration_for_this_narration:.2f}s 无法分配。")
+                               f"未覆盖任何原始黑板步骤。其总实际音频时长 {actual_total_duration_for_this_narration:.3f}s 无法分配。")
                 continue
             
-            if total_original_duration_of_steps_in_narration_span <= 1e-6: # 避免除零
+            if total_original_duration_of_steps_in_narration_span <= 1e-6: 
                 logger.warning(f"旁白 {i} 覆盖的步骤在其理论时间范围内的总原始时长贡献过小或为零 "
                                f"({total_original_duration_of_steps_in_narration_span:.2f}s)。无法按比例分配实际时长 "
-                               f"{actual_total_duration_for_this_narration:.2f}s。")
-                # 可选：如果只覆盖一个步骤，可以将全部时长给它
+                               f"{actual_total_duration_for_this_narration:.3f}s。")
                 if len(steps_covered_by_this_narration) == 1:
                     only_covered_step_id = steps_covered_by_this_narration[0]["step_id"]
                     accumulated_new_step_durations_float[only_covered_step_id] += actual_total_duration_for_this_narration
                     logger.info(f"  由于上述警告，但仅覆盖一个步骤 {only_covered_step_id}，已将全部实际时长分配给它。")
                 continue
 
-            # 4. 按比例分配此旁白的实际总时长给覆盖到的步骤
             for covered_step in steps_covered_by_this_narration:
                 step_id_to_update = covered_step["step_id"]
                 original_contribution = covered_step["original_contribution_in_span"]
@@ -310,40 +300,50 @@ class TimingSynchronizer:
                 distributed_duration_for_step = actual_total_duration_for_this_narration * proportion
                 
                 accumulated_new_step_durations_float[step_id_to_update] += distributed_duration_for_step
-                logger.debug(f"  步骤 {step_id_to_update}: 从旁白 {i} 分配到 {distributed_duration_for_step:.2f}s "
+                logger.debug(f"  步骤 {step_id_to_update}: 从旁白 {i} 分配到 {distributed_duration_for_step:.3f}s "
                             f"(原始贡献: {original_contribution:.2f}s / 总原始贡献: {total_original_duration_of_steps_in_narration_span:.2f}s, "
-                            f"旁白总实际时长: {actual_total_duration_for_this_narration:.2f}s)")
+                            f"旁白总实际时长: {actual_total_duration_for_this_narration:.3f}s)")
 
-        # 5. 完成所有旁白处理后，整理最终的步骤时长 (四舍五入，确保最小为1秒)
-        final_actual_durations_map = {}
+        final_actual_durations_map_float = {}
+        min_step_duration = 0.1 # 设定一个最小的步骤时长，例如0.1秒
+
         for step_id, calculated_total_duration_float in accumulated_new_step_durations_float.items():
-            if calculated_total_duration_float <= 1e-6: # 如果步骤未从任何旁白分配到时长
-                original_step_duration = float(original_durations_map.get(step_id, 1.0)) # 使用原始时长或至少1秒
-                final_actual_durations_map[step_id] = max(1, round(original_step_duration))
-                logger.info(f"步骤 {step_id} 未从任何旁白分配到有效时长。使用其原始时长 {original_step_duration:.2f}s, "
-                               f"调整为 {final_actual_durations_map[step_id]}s。")
+            if calculated_total_duration_float <= 1e-6: 
+                original_step_duration = float(original_durations_map.get(step_id, min_step_duration))
+                # 保留原始精度或至少为min_step_duration
+                final_duration = max(min_step_duration, original_step_duration)
+                final_actual_durations_map_float[step_id] = round(final_duration, 3)
+                logger.info(f"步骤 {step_id} 未从任何旁白分配到有效时长。使用其原始时长 {original_step_duration:.3f}s, "
+                               f"调整为 {final_actual_durations_map_float[step_id]:.3f}s。")
             else:
-                final_actual_durations_map[step_id] = max(1, round(calculated_total_duration_float))
+                # 保留计算精度，但确保不小于最小步骤时长，并四舍五入到3位小数
+                final_duration = max(min_step_duration, calculated_total_duration_float)
+                final_actual_durations_map_float[step_id] = round(final_duration, 3)
         
-        total_adjusted_blackboard_duration = sum(final_actual_durations_map.values())
-        logger.info(f"所有黑板步骤调整后的总时长为: {total_adjusted_blackboard_duration}s。")
-        logger.info(f"各步骤最终调整后时长: {final_actual_durations_map}")
+        total_adjusted_blackboard_duration_float = sum(final_actual_durations_map_float.values())
+        logger.info(f"所有黑板步骤调整后的总时长为: {total_adjusted_blackboard_duration_float:.3f}s。")
+        
+        log_output = ", ".join([f"Step {k}: {v:.3f}s" for k,v in final_actual_durations_map_float.items()])
+        logger.info(f"各步骤最终调整后时长: {log_output}")
 
-        return final_actual_durations_map
+        return final_actual_durations_map_float
     
-    def adjust_step_durations(self, actual_durations: Dict[int, int]) -> None:
+    def adjust_step_durations(self, actual_durations: Dict[int, float]) -> None:
         """
         根据实际音频持续时间调整黑板步骤的持续时间。
         """
         if not self.content_json:
             self.load_data()
             
-        # 更新每个步骤的持续时间
         for step in self.content_json["blackboard"]["steps"]:
             step_id = step["step_id"]
             if step_id in actual_durations:
-                logger.info(f"步骤 {step_id}: 原持续时间 {step['duration']}秒, 调整为 {actual_durations[step_id]}秒")
-                step["duration"] = actual_durations[step_id]
+                original_duration_val = step['duration']
+                new_duration_val = actual_durations[step_id]
+                # Log with appropriate formatting for float or int
+                logger.info(f"步骤 {step_id}: 原持续时间 {original_duration_val}秒, "
+                            f"调整为 {new_duration_val:.3f}秒")
+                step["duration"] = new_duration_val # Store as float
     
     def adjust_animation_timings(self) -> None:
         """
@@ -373,7 +373,7 @@ class TimingSynchronizer:
                             
                 logger.info(f"步骤 {step_id} 的动画时间已按比例 {scale_factor:.2f} 调整")
     
-    def analyze_timing_differences(self, original_durations: Dict[int, int], adjusted_durations: Dict[int, int]) -> Dict:
+    def analyze_timing_differences(self, original_durations: Dict[int, float], adjusted_durations: Dict[int, float]) -> Dict:
         """
         分析音频和黑板动画的时间差异, 基于已提供的原始和调整后的时长。
         """
@@ -382,24 +382,25 @@ class TimingSynchronizer:
             original = original_durations[step_id]
             actual = adjusted_durations.get(step_id, original)
             diff = actual - original
-            diff_percent = (diff / original) * 100 if original > 0 else 0
+            diff_percent = (diff / original) * 100 if original > 1e-6 else 0
             
             differences[step_id] = {
-                "original": original,
-                "actual": actual,
-                "difference": diff,
+                "original": round(original, 3),
+                "actual": round(actual, 3),
+                "difference": round(diff, 3),
                 "difference_percent": round(diff_percent, 2)
             }
             
         total_original = sum(original_durations.values())
         total_actual = sum(adjusted_durations.values())
+        total_diff_overall = total_actual - total_original
         
         return {
             "step_differences": differences,
-            "total_original": total_original,
-            "total_actual": total_actual,
-            "total_difference": total_actual - total_original,
-            "total_difference_percent": round(((total_actual - total_original) / total_original) * 100, 2) if total_original > 0 else 0
+            "total_original": round(total_original, 3),
+            "total_actual": round(total_actual, 3),
+            "total_difference": round(total_diff_overall, 3),
+            "total_difference_percent": round((total_diff_overall / total_original) * 100, 2) if total_original > 1e-6 else 0
         }
     
     def calculate_total_audio_duration(self) -> float:
@@ -420,17 +421,18 @@ class TimingSynchronizer:
             return self.audio_metadata[-1]["end_time"]
         return 0.0
     
-    def calculate_total_blackboard_duration(self) -> int:
+    def calculate_total_blackboard_duration(self) -> float:
         """
         计算总黑板动画持续时间。
         
         Returns:
-            int: 总黑板动画持续时间（秒）
+            float: 总黑板动画持续时间（秒）
         """
         if not self.content_json:
             self.load_data()
             
-        return sum(step["duration"] for step in self.content_json["blackboard"]["steps"])
+        # Durations are now floats in content_json
+        return sum(float(step["duration"]) for step in self.content_json["blackboard"]["steps"])
     
     def save_adjusted_content(self, output_path: str = None) -> str:
         """
@@ -461,43 +463,42 @@ class TimingSynchronizer:
         执行完整的同步过程并返回结果摘要。
         采用基于理论时间映射和实际音频时长比例分配的方式调整步骤时长。
         """
-        # 加载数据
         self.load_data()
         
-        # 计算每个步骤的实际音频持续时间 (采用新的精确映射逻辑)
-        actual_step_durations = self.calculate_actual_durations()
+        actual_step_durations_float = self.calculate_actual_durations()
         
-        # 获取原始持续时间（用于比较和分析）
-        # get_original_durations 返回的是 Dict[int, int]
-        original_durations : Dict[int, int] = {k: int(v) for k,v in self.get_original_durations().items()}
+        original_durations_float: Dict[int, float] = {
+            k: float(v) for k, v in self.get_original_durations().items()
+        }
 
-        if not actual_step_durations: # 如果计算失败，则不进行后续调整
+        if not actual_step_durations_float:
              logger.error("未能计算出有效的实际步骤时长，同步中止。")
+             # Ensure original_durations_float is used for reporting if actual_step_durations_float is empty
+             total_blackboard_orig_duration = sum(original_durations_float.values())
              return {
                 "error": "Failed to calculate actual step durations.",
-                "original_durations": original_durations,
+                "original_durations": {k: round(v,3) for k,v in original_durations_float.items()},
                 "adjusted_durations": {},
-                "total_audio_duration": self.calculate_total_audio_duration(),
-                "total_blackboard_duration": self.calculate_total_blackboard_duration(), # Should be original if no adjustment
+                "total_audio_duration": round(self.calculate_total_audio_duration(), 3),
+                "total_blackboard_duration": round(total_blackboard_orig_duration, 3),
              }
 
-        # 调整黑板步骤的持续时间
-        self.adjust_step_durations(actual_step_durations)
-        
-        # 调整步骤内动画的持续时间
+        self.adjust_step_durations(actual_step_durations_float)
         self.adjust_animation_timings()
-        
-        # 保存调整后的内容
         saved_path = self.save_adjusted_content(output_path)
         
-        timing_analysis = self.analyze_timing_differences(original_durations, actual_step_durations)
+        # Pass float dictionaries to analyze_timing_differences
+        timing_analysis = self.analyze_timing_differences(original_durations_float, actual_step_durations_float)
         
-        # 返回同步结果摘要
+        # Ensure all reported durations are consistently rounded for the final report
+        final_adjusted_durations_report = {k: round(v,3) for k,v in actual_step_durations_float.items()}
+        total_blackboard_adjusted_duration = self.calculate_total_blackboard_duration() # Recalculates from modified content_json
+
         return {
-            "original_durations": original_durations,
-            "adjusted_durations": actual_step_durations,
-            "total_audio_duration": self.calculate_total_audio_duration(),
-            "total_blackboard_duration": self.calculate_total_blackboard_duration(), # 从调整后的 content_json 计算
+            "original_durations": {k: round(v,3) for k,v in original_durations_float.items()},
+            "adjusted_durations": final_adjusted_durations_report,
+            "total_audio_duration": round(self.calculate_total_audio_duration(), 3),
+            "total_blackboard_duration": round(total_blackboard_adjusted_duration, 3),
             "saved_to": saved_path,
             "timing_analysis": timing_analysis
         } 
