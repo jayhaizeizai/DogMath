@@ -181,8 +181,9 @@ def generate_segmented_audio(json_path: str, output_dir: str) -> List[Dict[str, 
             logger.info(f"正在生成音频片段 {idx+1}/{len(narration)}")
             
             # 应用语音配置
-            voice_config = segment.get('voice_config', {})
-            voice_name = voice_config.get('speaker')
+            voice_config_data = segment.get('voice_config')
+            current_voice_config = voice_config_data if voice_config_data is not None else {}
+            voice_name = current_voice_config.get('speaker')
             
             # 生成音频文件
             audio_file = tts.synthesize_speech(

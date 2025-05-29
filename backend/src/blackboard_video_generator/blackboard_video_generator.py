@@ -74,12 +74,13 @@ class BlackboardVideoGenerator:
         计算 (1) 纵向可用高度、(2) 横向可用宽度 ，
         取二者里更严格的缩放因子，等比缩小元素 & 行间距。
         """
-        safe = step.get("safe_zone", {})
+        safe = step.get("safe_zone") or {}
         safe_top    = safe.get("top", 0.05)
         safe_bottom = max(safe.get("bottom", MIN_BOTTOM_SAFE), MIN_BOTTOM_SAFE)
         safe_right  = safe.get("right", 0.40)
 
-        v_space = step.get("vertical_spacing", 0.02)
+        vertical_spacing_val = step.get("vertical_spacing")
+        v_space = vertical_spacing_val if vertical_spacing_val is not None else 0.02
         elems   = step.get("elements", [])
 
         # ---------- ① 纵向约束 ----------
@@ -123,13 +124,14 @@ class BlackboardVideoGenerator:
         无论 text / formula / geometry 都水平居中摆放；
         有显式 'position' 的，只保留用户给的 x。
         """
-        safe  = step.get('safe_zone', {})
+        safe  = step.get('safe_zone') or {}
         safe_top    = safe.get('top', 0.05)
         safe_bottom = max(safe.get('bottom', MIN_BOTTOM_SAFE), MIN_BOTTOM_SAFE)
         safe_right  = safe.get('right', 0.40)
 
         avail_width_center = (1.0 - safe_right) / 2      # 内容区中心
-        v_space = step.get('vertical_spacing', 0.02)
+        vertical_spacing_val = step.get("vertical_spacing")
+        v_space = vertical_spacing_val if vertical_spacing_val is not None else 0.02
 
         y_cursor = safe_top
         for el in step['elements']:
