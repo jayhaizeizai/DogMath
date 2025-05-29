@@ -457,11 +457,21 @@ def add_subtitle_to_video(video_path: str, subtitle_path: str, output_path: str)
         添加是否成功
     """
     try:
+        # 定义字幕样式
+        # Fontsize: 字体大小，从24减小到18
+        # PrimaryColour: 主颜色 (FFFFFF 为白色)
+        # OutlineColour: 描边颜色 (000000 为黑色)
+        # BorderStyle: 边框样式。1 = 描边+阴影 (更轻量), 3 = 不透明背景框 (较重)
+        # MarginV: 垂直边距 (从底部算起)，增加到25像素，使字幕位置更靠下
+        # WrapStyle: 换行方式。0=智能换行, 1=只在\n处换行, 2=不换行(超长会溢出), 3=复杂换行(更倾向于单行但仍会处理过长文本)
+        # Alignment: 字幕对齐方式 (ASS标准: 1=左下, 2=中下, 3=右下 ... 默认为2，通常无需更改)
+        subtitle_style = "Fontsize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BorderStyle=1,MarginV=25,WrapStyle=3"
+        
         # 使用FFmpeg添加字幕
         cmd = [
             "ffmpeg", "-y",
             "-i", video_path,
-            "-vf", f"subtitles={subtitle_path}:force_style='Fontsize=24,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BorderStyle=3'",
+            "-vf", f"subtitles={subtitle_path}:force_style='{subtitle_style}'",
             "-c:a", "copy",
             output_path
         ]
