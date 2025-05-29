@@ -487,13 +487,14 @@ def add_subtitle_to_video(video_path: str, subtitle_path: str, output_path: str)
         logger.error(f"添加字幕过程出错: {str(e)}")
         return False
 
-def main(json_path: str, output_dir: str):
+def main(json_path: str, output_dir: str, final_output_filename: str = "output.mp4"):
     """
     主函数
     
     Args:
         json_path: 输入JSON文件路径
         output_dir: 输出目录
+        final_output_filename: 最终输出文件名
     """
     try:
         # 确保输出目录存在
@@ -505,7 +506,7 @@ def main(json_path: str, output_dir: str):
         
         temp_video_path = os.path.join(output_dir, "temp_video.mp4")
         temp_with_audio_path = os.path.join(output_dir, "temp_with_audio.mp4")
-        final_output_path = os.path.join(output_dir, "output.mp4")
+        final_output_path = os.path.join(output_dir, final_output_filename)
         
         # 步骤1: 生成音频片段
         logger.info("步骤1: 生成音频片段")
@@ -622,11 +623,19 @@ def main(json_path: str, output_dir: str):
         logger.error(f"视频制作过程中出现错误: {str(e)}")
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print("用法: python video_composer.py <输入JSON文件路径>")
+    if len(sys.argv) < 2:
+        print("用法: python video_composer.py <输入JSON文件路径> [输出目录] [最终输出文件名]")
         sys.exit(1)
         
-    json_path = sys.argv[1]
-    output_dir = "backend/output"
+    json_arg = sys.argv[1]
+    output_dir_arg = sys.argv[2] if len(sys.argv) > 2 else "backend/output"
+    # 如果直接运行，默认输出文件名基于输入JSON名
+    final_filename_arg = sys.argv[3] if len(sys.argv) > 3 else f"{Path(json_arg).stem}.mp4"
     
-    main(json_path, output_dir) 
+    # 配置日志（如果这个文件可能被独立运行）
+    if not logger.handlers: # 避免重复添加处理器
+        log_file_path = Path(output_dir_arg) / "video_composer_direct_run.log"
+        os.makedirs(Path(output_dir_arg), exist_ok=True)
+        logger.add(log_file_path, rotation="10 MB", retention="1 week", level="DEBUG", encoding="utf-8")
+
+    main(json_arg, output_dir_arg, final_output_filename=final_filename_arg) 

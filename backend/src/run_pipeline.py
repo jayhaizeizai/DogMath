@@ -42,17 +42,22 @@ def main():
     logger.info(f"开始处理JSON文件: {args.json_file}")
     
     try:
-        # 运行视频合成流程
-        compose_video(args.json_file, args.output_dir)
+        # 从输入JSON文件名构造期望的输出文件名
+        # 例如: "path/to/sample_math_problem_015.json" -> "sample_math_problem_015.mp4"
+        json_filename_stem = Path(args.json_file).stem
+        desired_output_filename = f"{json_filename_stem}.mp4"
+        
+        # 运行视频合成流程，传递期望的输出文件名
+        compose_video(args.json_file, args.output_dir, final_output_filename=desired_output_filename)
         
         # 检查最终输出文件是否生成
-        output_file = os.path.join(args.output_dir, "output.mp4")
-        if os.path.exists(output_file):
-            logger.info(f"视频生成成功: {output_file}")
-            print(f"视频生成成功: {output_file}")
+        expected_output_file_path = os.path.join(args.output_dir, desired_output_filename)
+        if os.path.exists(expected_output_file_path):
+            logger.info(f"视频生成成功: {expected_output_file_path}")
+            print(f"视频生成成功: {expected_output_file_path}")
         else:
-            logger.error("视频生成失败，未找到输出文件")
-            print("错误：视频生成失败，未找到输出文件")
+            logger.error(f"视频生成失败，未找到输出文件: {expected_output_file_path}")
+            print(f"错误：视频生成失败，未找到输出文件: {expected_output_file_path}")
             sys.exit(1)
             
     except Exception as e:
