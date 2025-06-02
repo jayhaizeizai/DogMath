@@ -210,68 +210,116 @@ class TimingSynchronizer:
     
     def calculate_actual_durations(self) -> Dict[int, float]:
         """
-        对每个音频片段，只分一次；按和每个黑板步骤的重叠比例分配，避免重复累计。
+        根据理论旁白的起始时间将其映射到唯一的黑板步骤，
+        然后将对应实际音频片段的时长累加到该步骤。
         """
         if not self.content_json or not self.audio_metadata:
             self.load_data()
 
-        # 1. 准备数据
-        step_intervals = self._build_step_intervals()    # [(id, s, e), ...]
-        step_totals = {sid: 0.0 for sid, _, _ in step_intervals}
+        # 1. 获取原始黑板步骤的时间区间 [(step_id, original_start, original_end), ...]
+        #    并初始化每个步骤的新时长为 0.0
+        step_intervals = self._build_step_intervals()
+        if not step_intervals:
+            logger.warning("未构建有效的步骤时间区间，无法计算实际时长。")
+            return {}
+        
+        new_step_durations = {step_id: 0.0 for step_id, _, _ in step_intervals}
 
-        # 2. 主循环：遍历「实际音频段」
-        for seg in self.audio_metadata:                  # 每个 seg 有 start_time / end_time / duration
-            seg_start, seg_end = seg["start_time"], seg["end_time"]
-            # Use actual segment duration for seg_len, not end-start, as segment's "duration" field is the source of truth for its length
-            seg_len = seg["duration"] 
-            if seg_len <= 1e-6:      # 极短或无效片段
-                logger.debug(f"Skipping audio segment {seg.get('id', 'N/A')} due to very short duration: {seg_len:.3f}s")
+        theoretical_narrations = self.content_json.get("audio", {}).get("narration", [])
+        actual_audio_segments = self.audio_metadata
+
+        # 2. 遍历理论旁白，映射到黑板步骤，并累加对应实际音频的时长
+        for i, narration_item in enumerate(theoretical_narrations):
+            if i >= len(actual_audio_segments):
+                logger.warning(f"理论旁白索引 {i} 超出实际音频片段数量 ({len(actual_audio_segments)})。跳过此旁白。")
                 continue
 
-            # 3. 找到与它有重叠的步骤并按重叠占比分配
-            for sid, step_start, step_end in step_intervals:
-                overlap = max(0.0, min(seg_end, step_end) - max(seg_start, step_start))
-                if overlap > 1e-6:
-                    weight = overlap / seg_len           # 占比 0~1
-                    step_totals[sid] += seg["duration"] * weight
-                    logger.debug(f"Audio seg (start:{seg_start:.2f}, end:{seg_end:.2f}, dur:{seg['duration']:.2f}) "
-                                 f"overlaps with Step {sid} (start:{step_start:.2f}, end:{step_end:.2f}) "
-                                 f"by {overlap:.2f}s. Weight: {weight:.3f}. "
-                                 f"Adding {seg['duration'] * weight:.3f}s to Step {sid}. "
-                                 f"New total for Step {sid}: {step_totals[sid]:.3f}s")
+            theoretical_start_time_val = narration_item.get("start_time")
+            if theoretical_start_time_val is None:
+                logger.warning(f"理论旁白 {i} 缺少 'start_time'。跳过。")
+                continue
+            
+            try:
+                theoretical_start_time = float(theoretical_start_time_val)
+            except (TypeError, ValueError):
+                logger.warning(f"理论旁白 {i} 的 'start_time' ({theoretical_start_time_val}) 无效。跳过。")
+                continue
 
-        # 4. 最小时长保护 & 四舍五入
-        min_len = 0.1
-        # Ensure all original step_ids are present in step_totals before this,
-        # even if they had no overlap (they would have 0.0 from initialization).
-        final_step_totals = {}
-        for sid, _, _ in step_intervals: # Iterate using original step_ids from step_intervals to ensure all are processed
-            calculated_duration = step_totals.get(sid, 0.0) # Get calculated duration, default to 0 if somehow missing
-            final_step_totals[sid] = round(max(min_len, calculated_duration), 3)
-            if calculated_duration < min_len and calculated_duration > 1e-6 : # Log if min_len protection was applied to a non-zero small value
-                 logger.info(f"Step {sid}: Calculated duration {calculated_duration:.3f}s was less than min_len {min_len}s. Adjusted to {min_len}s.")
-            elif calculated_duration <= 1e-6: # Log if step got no significant audio assigned
-                 logger.info(f"Step {sid}: No significant audio duration assigned. Adjusted to min_len {min_len}s.")
+            target_step_id = None
+            # 确定此旁白属于哪个黑板步骤
+            for step_id, step_original_start, step_original_end in step_intervals:
+                # 旁白属于步骤，如果其理论start_time落在步骤的 [start, end) 区间内
+                # 对于最后一个步骤，如果它的时长为0 (start==end)，并且旁白恰好在那个时间点开始
+                if step_original_start == step_original_end and step_original_start == theoretical_start_time and step_id == step_intervals[-1][0]:
+                    target_step_id = step_id
+                    break
+                if step_original_start <= theoretical_start_time < step_original_end:
+                    target_step_id = step_id
+                    break
+            
+            if target_step_id is not None:
+                actual_segment = actual_audio_segments[i]
+                actual_duration_val = actual_segment.get("duration")
+                if actual_duration_val is None:
+                    logger.warning(f"实际音频片段 {i} (对应理论旁白 {i}) 缺少 'duration'。跳过。")
+                    continue
+                try:
+                    actual_duration = float(actual_duration_val)
+                except (TypeError, ValueError):
+                    logger.warning(f"实际音频片段 {i} 的 'duration' ({actual_duration_val}) 无效。跳过。")
+                    continue
 
+                if actual_duration > 1e-6: # 只有有效时长才累加
+                    new_step_durations[target_step_id] += actual_duration
+                    logger.debug(f"理论旁白 {i} (原start: {theoretical_start_time:.2f}s) "
+                                 f"映射到步骤 {target_step_id}. "
+                                 f"其实际音频时长 {actual_duration:.3f}s 已累加. "
+                                 f"步骤 {target_step_id} 当前总长: {new_step_durations[target_step_id]:.3f}s")
+                else:
+                    logger.debug(f"理论旁白 {i} 对应的实际音频时长 ({actual_duration:.3f}s) 过短，未累加。")
+            else:
+                logger.warning(f"理论旁白 {i} (原start: {theoretical_start_time:.2f}s) "
+                               f"无法映射到任何黑板步骤。其对应的实际音频时长将不会被分配。")
 
-        # 5. 调试：保证总和≈音频总长
-        total_audio_actual_duration = sum(seg.get("duration", 0.0) for seg in self.audio_metadata) # Sum of actual durations from audio_metadata
-        total_steps_calculated = sum(final_step_totals.values())
+        # 3. 应用最小时长保护和四舍五入
+        min_len = 0.1  # 最小步长，例如0.1秒
+        final_step_durations = {}
+        for step_id_from_interval, _, _ in step_intervals: #确保所有原始步骤都被处理
+            accumulated_audio_duration = new_step_durations.get(step_id_from_interval, 0.0)
+            
+            final_duration = round(max(min_len, accumulated_audio_duration), 3)
+            final_step_durations[step_id_from_interval] = final_duration
 
-        logger.info(f"Total actual audio duration from metadata: {total_audio_actual_duration:.3f}s")
-        logger.info(f"Total sum of calculated step durations after min_len protection: {total_steps_calculated:.3f}s")
-
-        # The original warning used self.calculate_total_audio_duration() which might be based on last segment's end_time.
-        # For a more direct comparison with how durations were summed, using sum of individual segment durations is better.
-        if abs(total_audio_actual_duration - total_steps_calculated) > 1.0:  # 允许 1s 容差
-            logger.warning(f"⚠️ Sum of adjusted step durations ({total_steps_calculated:.3f}s) "
-                           f"and total actual audio duration ({total_audio_actual_duration:.3f}s) differ by more than 1s. "
-                           f"Please check audio segmentation or step definitions.")
+            if accumulated_audio_duration < min_len and accumulated_audio_duration >= 0: # Check >=0 to avoid logging for negative if error
+                 logger.info(f"步骤 {step_id_from_interval}: 累积音频时长 {accumulated_audio_duration:.3f}s "
+                             f"小于最小限制 {min_len}s。已调整为 {min_len}s。")
         
-        log_output = ", ".join([f"Step {k}: {v:.3f}s" for k,v in final_step_totals.items()])
-        logger.info(f"Each step's final adjusted duration: {log_output}")
+        # 4. 调试日志：检查总时长是否大致等于实际音频总时长
+        # 计算实际音频元数据中所有片段的'duration'总和
+        total_actual_audio_duration_from_metadata = sum(
+            float(seg.get("duration", 0.0)) 
+            for seg in actual_audio_segments 
+            if isinstance(seg.get("duration"), (int, float))
+        )
+        
+        total_calculated_step_durations = sum(final_step_durations.values())
 
-        return final_step_totals
+        logger.info(f"实际音频总时长 (来自audio_metadata各项duration之和): {total_actual_audio_duration_from_metadata:.3f}s")
+        logger.info(f"调整后所有黑板步骤总时长 (应用最小时长保护后): {total_calculated_step_durations:.3f}s")
+
+        # 容差可以根据需求调整，例如对于很多短步骤应用了min_len后，总和可能比音频总长大
+        # 这里的差异主要可能来自：1. 未映射的音频；2. min_len保护对总时长的提升。
+        diff_threshold = max(1.0, 0.05 * total_actual_audio_duration_from_metadata) # 例如1秒或5%音频总长，取较大者
+        if abs(total_actual_audio_duration_from_metadata - total_calculated_step_durations) > diff_threshold:
+            logger.warning(f"⚠️ 调整后步骤总时长 ({total_calculated_step_durations:.3f}s) "
+                           f"与实际音频总时长 ({total_actual_audio_duration_from_metadata:.3f}s) "
+                           f"差异超过阈值 ({diff_threshold:.2f}s)。请检查日志中是否有未映射的旁白，"
+                           f"或评估最小时长保护对整体时长的影响。")
+
+        log_output = ", ".join([f"步骤 {k}: {v:.3f}s" for k, v in final_step_durations.items()])
+        logger.info(f"各步骤最终调整后时长: {log_output}")
+
+        return final_step_durations
     
     def adjust_step_durations(self, actual_durations: Dict[int, float]) -> None:
         """
