@@ -46,8 +46,21 @@ def generate_blackboard_video(json_path: str, output_path: str):
         # 保存视频
         logger.info("开始保存视频...")
         if isinstance(video, str):  # 如果返回的是临时文件路径
-            if video != output_path:  # 只有当源文件和目标文件不同时才复制
-                shutil.copy2(video, output_path)
+            temp_video_path_from_generator = video
+            if temp_video_path_from_generator != output_path:  # 只有当源文件和目标文件不同时才复制
+                shutil.copy2(temp_video_path_from_generator, output_path)
+                logger.info(f"临时黑板视频已复制到: {output_path}")
+            else:
+                logger.info(f"临时黑板视频路径与目标路径相同，无需复制: {output_path}")
+            
+            # 清理由 BlackboardVideoGenerator 生成的临时文件
+            if os.path.exists(temp_video_path_from_generator):
+                try:
+                    os.remove(temp_video_path_from_generator)
+                    logger.info(f"已清理 BlackboardVideoGenerator 临时文件: {temp_video_path_from_generator}")
+                except OSError as e:
+                    logger.warning(f"清理 BlackboardVideoGenerator 临时文件失败 {temp_video_path_from_generator}: {e}")
+            
         else:  # 如果返回的是视频对象
             video.release()
             

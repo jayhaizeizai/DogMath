@@ -340,13 +340,29 @@ def preprocess_teacher_segment(input_video_path: str, output_video_path: str) ->
     try:
         os.makedirs(os.path.dirname(output_video_path), exist_ok=True)
 
+        # 调整滤镜顺序和参数，以更保守和正确的方式进行抠像
+        # 1. 初始格式为 RGBA
+        # 2. 使用精确的颜色键和保守的相似度/混合度进行抠像
+        # 3. 再次确保格式为 RGBA，以保证 Alpha 通道传递给后续滤镜
+        # 4. 在抠像完成后再进行色彩调整、模糊和锐化
+        
+        # 之前使用的 colorbalance 和 unsharp 参数
+        # "colorbalance=bs=0.10:bh=-0.05,"
+        # "unsharp=5:5:1.0:5:5:0.0"
+        # 整合 eq (替代 colorbalance 的一种方式) 和 unsharp
+        
         filter_effects = (
-            "format=rgba,"  # 确保有Alpha通道用于抠像
-            "colorkey=0x0D47A1:0.05:0.05,"  # 蓝幕抠像 (根据实际背景色调整)
-            "boxblur=0:0:0:0:2:1,"          # 轻微模糊边缘 (可选)
-            "colorbalance=bs=0.10:bh=-0.05," # 色彩平衡调整 (可选)
-            "unsharp=5:5:1.0:5:5:0.0"       # 轻微锐化 (可选)
+            "format=rgba,"                         # 1. 确保输入为 RGBA
+            "colorkey=0x0A459D:0.20:0.05,"         # 2. 保守抠像 (颜色:0x0A459D, similarity:0.20, blend:0.05)
+            "format=rgba,"                         # 3. 再次确保 RGBA 以传递 Alpha
+            # "eq=saturation=1.1:contrast=1.05,"   # 4. 抠完再调色 (可选，暂时注释，先确保抠像)
+            "boxblur=0:0:0:0:2:1"                # 5. 轻微模糊边缘 (可选，暂时保留一个简单的模糊)
+            # "unsharp=5:5:1.0:5:5:0.0"            # 6. 锐化 (可选，暂时注释)
         )
+        
+        # 如果需要更复杂的边缘处理或色彩校正，可以在这里扩展 filter_effects 字符串
+        # 例如，加入你提到的 gblur 和 tblend，或者形态学操作
+        # filter_effects += ",gblur=sigma=3,tblend=all_mode=screen:opacity=1"
 
         cmd = [
             "ffmpeg", "-y",
@@ -377,7 +393,7 @@ def overlay_teacher_video(main_video: str, teacher_videos: List[str], output_pat
 
     Args:
         main_video: 主视频文件路径 (通常是 temp_with_audio.mp4)
-        teacher_videos: 教师视频片段文件名列表 (相对于 Config.TEACHER_VIDEO_DIR)
+        teacher_videos: 教师视频片段路径列表 (通常是相对于工作区根目录的完整路径)
         output_path: 最终输出文件路径
 
     Returns:
@@ -404,7 +420,7 @@ def overlay_teacher_video(main_video: str, teacher_videos: List[str], output_pat
     # 文件名格式应为 teacher_video_{timestamp_ms}_{index}.mp4
     try:
         sorted_teacher_videos = sorted(
-            teacher_videos,
+            teacher_videos, # 这已经是原始教师视频的路径列表
             key=lambda x: get_timestamp_from_filename(Path(x).stem)
         )
         logger.info(f"原始教师视频（待预处理）顺序: {sorted_teacher_videos}")
@@ -413,22 +429,61 @@ def overlay_teacher_video(main_video: str, teacher_videos: List[str], output_pat
         return False
         
     processed_teacher_segments = []
-    base_output_dir = Path(output_path).parent
-    processed_teacher_dir = base_output_dir / "teacher_video_processed"
-    os.makedirs(processed_teacher_dir, exist_ok=True)
+    # 定义处理后教师视频的资源目录
+    resource_processed_teacher_dir = Path("backend/resource/teacher_video_processed")
+    os.makedirs(resource_processed_teacher_dir, exist_ok=True) # 确保目录存在
 
-    logger.info("开始预处理教师视频片段...")
-    for teacher_video_filename in sorted_teacher_videos:
-        input_segment_path = str(Path(Config.TEACHER_VIDEO_DIR) / teacher_video_filename)
-        # 使用原始文件名（不含后缀）加上新的后缀和目录
-        output_segment_name = f"{Path(teacher_video_filename).stem}_processed.mov"
-        output_segment_path = str(processed_teacher_dir / output_segment_name)
+    # base_output_dir 用于存放合并和循环过程中的临时文件，保持不变
+    base_output_dir = Path(output_path).parent 
+
+    logger.info(f"开始处理教师视频片段。预处理结果将存放在/查找于: {resource_processed_teacher_dir}")
+    for original_segment_path_str in sorted_teacher_videos: # original_segment_path_str 是原始片段的路径
         
-        if not preprocess_teacher_segment(input_segment_path, output_segment_path):
-            logger.error(f"预处理教师视频片段 {input_segment_path} 失败。")
-            return False
-        processed_teacher_segments.append(output_segment_path)
-    
+        # 定义预处理后在资源目录中的目标文件名和路径
+        output_segment_name = f"{Path(original_segment_path_str).stem}_processed.mov"
+        resource_segment_path = str(resource_processed_teacher_dir / output_segment_name)
+
+        found_valid_in_resource = False
+        if os.path.exists(resource_segment_path):
+            duration = get_video_duration(resource_segment_path)
+            if duration > 0:
+                logger.info(f"在资源目录中找到有效预处理片段: {resource_segment_path} (时长: {duration:.2f}s)")
+                found_valid_in_resource = True
+            else:
+                logger.warning(f"资源目录中的预处理片段 {resource_segment_path} 无效 (时长为0)。")
+
+        if Config.ENABLE_TEACHER_VIDEO_GENERATION or not found_valid_in_resource:
+            # 条件1: 如果强制重新生成 (Config.ENABLE_TEACHER_VIDEO_GENERATION is True)
+            # 条件2: 或者，资源目录中没有有效的预处理文件
+            
+            if not os.path.exists(original_segment_path_str):
+                logger.warning(f"原始教师视频片段 {original_segment_path_str} 不存在，无法进行预处理。")
+                continue # 跳过此片段的处理
+
+            action = "重新预处理" if Config.ENABLE_TEACHER_VIDEO_GENERATION else "预处理（资源目录中未找到或无效）"
+            logger.info(f"{action}: {Path(original_segment_path_str).name} -> {Path(resource_segment_path).name}")
+            
+            if not preprocess_teacher_segment(original_segment_path_str, resource_segment_path):
+                logger.error(f"预处理教师视频片段 {original_segment_path_str} 失败。")
+                # 根据情况决定是否终止整个流程，这里选择继续处理其他片段，但可以改为 return False
+                continue 
+            
+            # 验证新生成的预处理文件是否有效
+            new_duration = get_video_duration(resource_segment_path)
+            if new_duration > 0:
+                processed_teacher_segments.append(resource_segment_path)
+                logger.info(f"成功预处理并保存到资源目录: {resource_segment_path} (时长: {new_duration:.2f}s)")
+            else:
+                logger.error(f"预处理后的文件 {resource_segment_path} 时长为0，预处理可能实际失败。")
+
+        elif found_valid_in_resource: # 此条件暗含 Config.ENABLE_TEACHER_VIDEO_GENERATION is False
+            # 如果在资源目录中找到了有效片段，并且没有强制重新生成
+            logger.info(f"成功复用资源目录中已存在的预处理片段: {resource_segment_path}")
+            processed_teacher_segments.append(resource_segment_path)
+        else:
+            # 理论上这个分支不应该被达到，因为上面的逻辑已经覆盖了所有情况
+            logger.warning(f"未知状态，无法处理教师片段 {original_segment_path_str}。资源文件路径: {resource_segment_path}")
+
     if not processed_teacher_segments:
         logger.error("没有成功预处理的教师视频片段。")
         return False
@@ -465,28 +520,17 @@ def overlay_teacher_video(main_video: str, teacher_videos: List[str], output_pat
     logger.info("合并预处理后的教师视频成功。")
     os.unlink(temp_concat_list_path) # 清理临时文件
 
-    # 新增步骤：将合并后的 QTRLE 教师视频压缩为高质量 H.264
-    temp_teacher_concat_compressed_path = str(base_output_dir / "temp_teacher_concat_compressed.mp4")
-    logger.info(f"开始将合并后的教师视频 (QTRLE) 压缩为高质量 H.264 -> {temp_teacher_concat_compressed_path}")
-    cmd_compress_teacher = [
-        "ffmpeg", "-y", 
-        "-i", concatenated_processed_teacher_video_path,
-        "-c:v", "libx264",
-        "-preset", "medium", 
-        "-crf", "18",         
-        "-pix_fmt", "yuv420p",
-        "-an",                
-        temp_teacher_concat_compressed_path
-    ]
-    if not run_command(cmd_compress_teacher):
-        logger.error(f"将合并后的教师视频压缩为 H.264 失败: {concatenated_processed_teacher_video_path}")
-        return False
-    logger.info("合并后的教师视频已成功压缩为 H.264。")
+    # --- 使用方案 A：直接使用合并后的 QTRLE 文件，跳过压缩到 H.264 的步骤 ---
+    # 输入给 stream_loop 的文件就是合并后的 QTRLE 文件
+    looped_input_path = concatenated_processed_teacher_video_path
+    logger.info(f"将直接使用合并后的 QTRLE 教师视频进行循环: {looped_input_path}")
+    # --- End of Scheme A change ---
 
     # 获取压缩后的单个教师视频单元的时长
     # concatenated_teacher_duration = get_video_duration(concatenated_processed_teacher_video_path)
     # 改为获取新压缩的 H.264 文件的时长
-    concatenated_teacher_duration = get_video_duration(temp_teacher_concat_compressed_path)
+    # concatenated_teacher_duration = get_video_duration(temp_teacher_concat_compressed_path)
+    concatenated_teacher_duration = get_video_duration(looped_input_path)
 
 
     if concatenated_teacher_duration == 0.0:
@@ -512,19 +556,22 @@ def overlay_teacher_video(main_video: str, teacher_videos: List[str], output_pat
     
     # 准备物理循环扩展并重编码教师视频
     # 输出一个MP4文件，使用libx264编码，不包含音频
-    materialized_looped_teacher_path = str(base_output_dir / "temp_teacher_materialized_reencoded.mp4")
+    # materialized_looped_teacher_path = str(base_output_dir / "temp_teacher_materialized_reencoded.mp4")
+    # 由于我们全程使用.mov qtrle，所以这里也输出.mov
+    materialized_looped_teacher_path = str(base_output_dir / "temp_teacher_materialized_reencoded.mov")
 
-    logger.info(f"开始重新编码物理循环扩展后的教师视频 (libx264) -> {Path(materialized_looped_teacher_path).name}")
+
+    logger.info(f"开始重新编码物理循环扩展后的教师视频 (qtrle) -> {Path(materialized_looped_teacher_path).name}")
     
     cmd_loop_reencode_teacher = [
         "ffmpeg", "-y", 
         "-stream_loop", str(ffmpeg_stream_loop_param),
-        # 使用新压缩的 H.264 文件作为输入
-        "-i", temp_teacher_concat_compressed_path, 
-        "-c:v", "libx264",
-        "-pix_fmt", "yuv420p",
-        "-preset", "ultrafast", 
-        "-crf", "18", 
+        # 使用合并后的 QTRLE 文件作为输入
+        "-i", looped_input_path, 
+        "-c:v", "qtrle",        # ✨ 输出为 qtrle 以保留 Alpha
+        # "-pix_fmt", "yuva420p", # ✨ Alpha通道保留：yuv420p -> yuva420p (如果用libx264)
+        # "-preset", "ultrafast", # (libx264 参数)
+        # "-crf", "18",           # (libx264 参数)
         "-an", 
         materialized_looped_teacher_path
     ]
@@ -537,6 +584,13 @@ def overlay_teacher_video(main_video: str, teacher_videos: List[str], output_pat
 
     # 最后，叠加处理好的教师视频到主视频上
     logger.info(f"开始最终叠加教师视频 {Path(materialized_looped_teacher_path).name} 到主视频 {Path(main_video).name}")
+    
+    # 获取边距配置，如果Config中没有则使用默认值
+    teacher_video_margin_x = getattr(Config, 'TEACHER_VIDEO_MARGIN_X', 10)
+    teacher_video_margin_y = getattr(Config, 'TEACHER_VIDEO_MARGIN_Y', 10)
+    video_encoding_crf = getattr(Config, 'VIDEO_ENCODING_CRF', 23) # 假设默认CRF为23
+    video_encoding_preset = getattr(Config, 'VIDEO_ENCODING_PRESET', "medium") # 假设默认preset为medium
+
     final_overlay_cmd = [
         "ffmpeg", "-y", 
         "-i", main_video,
@@ -548,13 +602,13 @@ def overlay_teacher_video(main_video: str, teacher_videos: List[str], output_pat
         # TODO: 考虑将教师视频缩放到特定尺寸或比例，而不是依赖其原始尺寸
         # 例如: "[1:v]scale=iw*0.2:-1[scaled_teacher];[0:v][scaled_teacher]overlay=main_w-overlay_w-10:main_h-overlay_h-10:shortest=1[out_v]",
         # 为了简化，暂时保持原有逻辑，但这里的overlay参数值得回顾
-        f"[0:v][1:v]overlay=main_w-overlay_w-{Config.TEACHER_VIDEO_MARGIN_X}:main_h-overlay_h-{Config.TEACHER_VIDEO_MARGIN_Y}:shortest=1[out_v]",
+        f"[0:v][1:v]overlay=main_w-overlay_w-{teacher_video_margin_x}:main_h-overlay_h-{teacher_video_margin_y}:shortest=1[out_v]",
         "-map", "[out_v]",
         "-map", "0:a?", # 映射主视频的音频流（如果存在）
         "-c:v", "libx264", # 最终输出的视频编码
         "-pix_fmt", "yuv420p",
-        "-crf", str(Config.VIDEO_ENCODING_CRF), 
-        "-preset", Config.VIDEO_ENCODING_PRESET,
+        "-crf", str(video_encoding_crf), 
+        "-preset", video_encoding_preset,
         "-c:a", "copy", # 从主视频复制音频流
         "-shortest", # 确保输出以最短的输入流为准（通常是主视频，因为教师视频已循环匹配）
         output_path
@@ -566,16 +620,15 @@ def overlay_teacher_video(main_video: str, teacher_videos: List[str], output_pat
     logger.info(f"教师视频叠加成功，最终输出: {output_path}")
 
     # 清理临时文件
-    # temp_teacher_concat_processed.mov (QTRLE)
-    # temp_teacher_concat_compressed.mp4 (H.264 压缩版)
-    # temp_teacher_materialized_reencoded.mp4 (循环并重编码的 H.264)
+    # concatenated_processed_teacher_video_path (即 temp_teacher_concat_processed.mov)
+    # materialized_looped_teacher_path (即 temp_teacher_materialized_reencoded.mov)
     try:
+        # looped_input_path 变量在此上下文中不可用，我们应该清理原始的合并文件
+        # concatenated_processed_teacher_video_path 的值是 str(base_output_dir / "temp_teacher_concat_processed.mov")
         if os.path.exists(concatenated_processed_teacher_video_path):
             os.remove(concatenated_processed_teacher_video_path)
             logger.debug(f"已清理临时文件: {concatenated_processed_teacher_video_path}")
-        if os.path.exists(temp_teacher_concat_compressed_path):
-            os.remove(temp_teacher_concat_compressed_path)
-            logger.debug(f"已清理临时文件: {temp_teacher_concat_compressed_path}")
+
         if os.path.exists(materialized_looped_teacher_path):
             os.remove(materialized_looped_teacher_path)
             logger.debug(f"已清理临时文件: {materialized_looped_teacher_path}")
@@ -814,9 +867,9 @@ def main(json_path: str, output_dir: str, final_output_filename: str = "output.m
                 os.unlink(temp_file)
         
         # 清理同步生成的临时JSON文件
-        # if synchronized_json_path != json_path and os.path.exists(synchronized_json_path):
-        #     os.unlink(synchronized_json_path)
-        #     logger.info(f"已清理临时同步JSON文件: {synchronized_json_path}")
+        if synchronized_json_path != json_path and os.path.exists(synchronized_json_path):
+            os.unlink(synchronized_json_path)
+            logger.info(f"已清理临时同步JSON文件: {synchronized_json_path}")
             
         # 清理同步报告JSON文件
         report_path = Path(synchronized_json_path).with_suffix('.report.json')
