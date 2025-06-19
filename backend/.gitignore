@@ -42,3 +42,5 @@ screenshot_check.png
 */*/credentials.json
 */*/*.key
 */*-*.json
+
+data/

@@ -279,6 +279,41 @@ class BlackboardVideoGenerator:
                 if is_vertical_stack_layout:
                     self._auto_vertical_stack(current_step)
                 else:
+                    # 对于自由布局，根据JSON中的位置进行渲染
+                    # 新增：自动调整垂直重叠的文本元素
+                    elements_to_render = current_step.get('elements', [])
+                    for i in range(1, len(elements_to_render)):
+                        prev_el = elements_to_render[i-1]
+                        curr_el = elements_to_render[i]
+                        
+                        # 确保元素有尺寸和位置
+                        if 'size' not in prev_el or 'size' not in curr_el or 'position' not in prev_el or 'position' not in curr_el:
+                            continue
+
+                        # 只处理x坐标相近的文本元素
+                        if prev_el['type'] == 'text' and curr_el['type'] == 'text':
+                            # 假设position[0]是相对安全区的x坐标
+                            is_vertically_aligned = abs(prev_el['position'][0] - curr_el['position'][0]) < 0.05
+                            
+                            if is_vertically_aligned:
+                                prev_h = prev_el['size'][1]
+                                curr_h = curr_el['size'][1]
+                                prev_y = prev_el['position'][1]
+                                curr_y = curr_el['position'][1]
+                                
+                                # 元素边界计算（以中心点为基准）
+                                prev_bottom = prev_y + prev_h / 2
+                                curr_top = curr_y - curr_h / 2
+                                
+                                vertical_gap = 0.02 # 定义一个最小的垂直间距
+
+                                if curr_top < prev_bottom + vertical_gap:
+                                    # 重叠，调整当前元素的y坐标
+                                    new_y = prev_bottom + curr_h / 2 + vertical_gap
+                                    curr_el['position'][1] = new_y
+                                    if self.debug:
+                                        self.logger.info(f"Step {step_id_for_log}: 自动调整重叠文本。元素 {i} 的Y坐标从 {curr_y:.3f} 调整为 {new_y:.3f}")
+
                     for element in current_step.get('elements', []):
                         element_type_for_log = element.get('type', 'Unknown')
                         if element.get('position'): 
