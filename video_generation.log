@@ -1,0 +1,784 @@
+2025-06-05 17:39:24,791 [INFO] - 视频批量生成开始.
+2025-06-05 17:39:24,791 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_010.json
+2025-06-05 17:39:24,791 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_010.json
+2025-06-05 17:43:41,293 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_010.json (耗时: 256.50 秒)
+2025-06-05 17:43:41,293 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_010.mp4
+
+2025-06-05 17:43:41,293 [INFO] - --------------------------------------------------
+2025-06-05 17:43:41,293 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_012.json
+2025-06-05 17:43:41,293 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_012.json
+2025-06-05 17:48:23,500 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_012.json (耗时: 282.21 秒)
+2025-06-05 17:48:23,500 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_012.mp4
+
+2025-06-05 17:48:23,500 [INFO] - --------------------------------------------------
+2025-06-05 17:48:23,500 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_014.json
+2025-06-05 17:48:23,500 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_014.json
+2025-06-05 17:49:15,252 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_014.json (耗时: 51.75 秒)
+2025-06-05 17:49:15,252 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_014.mp4
+
+2025-06-05 17:49:15,252 [INFO] - --------------------------------------------------
+2025-06-05 17:49:15,252 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_016.json
+2025-06-05 17:49:15,252 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_016.json
+2025-06-05 17:50:02,151 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_016.json (耗时: 46.90 秒)
+2025-06-05 17:50:02,151 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_016.mp4
+
+2025-06-05 17:50:02,151 [INFO] - --------------------------------------------------
+2025-06-05 17:50:02,151 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_024.json
+2025-06-05 17:50:02,151 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_024.json
+2025-06-05 17:51:10,305 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_024.json (耗时: 68.15 秒)
+2025-06-05 17:51:10,305 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_024.mp4
+
+2025-06-05 17:51:10,305 [INFO] - --------------------------------------------------
+2025-06-05 17:51:10,305 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_026.json
+2025-06-05 17:51:10,305 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_026.json
+2025-06-05 17:52:59,692 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_026.json (耗时: 109.39 秒)
+2025-06-05 17:52:59,692 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_026.mp4
+
+2025-06-05 17:52:59,692 [INFO] - --------------------------------------------------
+2025-06-05 17:52:59,692 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_027.json
+2025-06-05 17:52:59,692 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_027.json
+2025-06-05 17:53:14,743 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_027.json (耗时: 15.05 秒)
+2025-06-05 17:53:14,743 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_027.mp4
+
+2025-06-05 17:53:14,743 [INFO] - --------------------------------------------------
+2025-06-05 17:53:14,743 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_028.json
+2025-06-05 17:53:14,743 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_028.json
+2025-06-05 17:55:23,957 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_028.json (耗时: 129.21 秒)
+2025-06-05 17:55:23,957 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_028.mp4
+
+2025-06-05 17:55:23,957 [INFO] - --------------------------------------------------
+2025-06-05 17:55:23,957 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_034.json
+2025-06-05 17:55:23,957 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_034.json
+2025-06-05 18:02:49,937 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_034.json (耗时: 445.98 秒)
+2025-06-05 18:02:49,937 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_034.mp4
+
+2025-06-05 18:02:49,937 [INFO] - --------------------------------------------------
+2025-06-05 18:02:49,937 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_036.json
+2025-06-05 18:02:49,937 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_036.json
+2025-06-05 18:04:00,303 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_036.json (耗时: 70.37 秒)
+2025-06-05 18:04:00,303 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_036.mp4
+
+2025-06-05 18:04:00,303 [INFO] - --------------------------------------------------
+2025-06-05 18:04:00,303 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_037.json
+2025-06-05 18:04:00,303 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_037.json
+2025-06-05 18:05:46,895 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_037.json (耗时: 106.59 秒)
+2025-06-05 18:05:46,895 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_037.mp4
+
+2025-06-05 18:05:46,895 [INFO] - --------------------------------------------------
+2025-06-05 18:05:46,895 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_040.json
+2025-06-05 18:05:46,895 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_040.json
+2025-06-05 18:08:49,104 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_040.json (耗时: 182.21 秒)
+2025-06-05 18:08:49,104 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_040.mp4
+
+2025-06-05 18:08:49,104 [INFO] - --------------------------------------------------
+2025-06-05 18:08:49,104 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_042.json
+2025-06-05 18:08:49,104 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_042.json
+2025-06-05 18:09:58,617 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_042.json (耗时: 69.51 秒)
+2025-06-05 18:09:58,617 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_042.mp4
+
+2025-06-05 18:09:58,617 [INFO] - --------------------------------------------------
+2025-06-05 18:09:58,617 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_044.json
+2025-06-05 18:09:58,617 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_044.json
+2025-06-05 18:11:31,915 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_044.json (耗时: 93.30 秒)
+2025-06-05 18:11:31,915 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_044.mp4
+
+2025-06-05 18:11:31,915 [INFO] - --------------------------------------------------
+2025-06-05 18:11:31,915 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_048.json
+2025-06-05 18:11:31,915 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_048.json
+2025-06-05 18:13:01,843 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_048.json (耗时: 89.93 秒)
+2025-06-05 18:13:01,843 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_048.mp4
+
+2025-06-05 18:13:01,843 [INFO] - --------------------------------------------------
+2025-06-05 18:13:01,843 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_049.json
+2025-06-05 18:13:01,843 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_049.json
+2025-06-05 18:14:54,218 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_049.json (耗时: 112.37 秒)
+2025-06-05 18:14:54,218 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_049.mp4
+
+2025-06-05 18:14:54,218 [INFO] - --------------------------------------------------
+2025-06-05 18:14:54,218 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_050.json
+2025-06-05 18:14:54,218 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_050.json
+2025-06-05 18:18:34,966 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_050.json (耗时: 220.75 秒)
+2025-06-05 18:18:34,966 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_050.mp4
+
+2025-06-05 18:18:34,966 [INFO] - --------------------------------------------------
+2025-06-05 18:18:34,966 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_051.json
+2025-06-05 18:18:34,966 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_051.json
+2025-06-05 18:20:51,876 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_051.json (耗时: 136.91 秒)
+2025-06-05 18:20:51,876 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_051.mp4
+
+2025-06-05 18:20:51,876 [INFO] - --------------------------------------------------
+2025-06-05 18:20:51,876 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_052.json
+2025-06-05 18:20:51,876 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_052.json
+2025-06-05 18:21:58,844 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_052.json (耗时: 66.97 秒)
+2025-06-05 18:21:58,844 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_052.mp4
+
+2025-06-05 18:21:58,844 [INFO] - --------------------------------------------------
+2025-06-05 18:21:58,844 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_053.json
+2025-06-05 18:21:58,844 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_053.json
+2025-06-05 18:23:15,705 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_053.json (耗时: 76.86 秒)
+2025-06-05 18:23:15,705 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_053.mp4
+
+2025-06-05 18:23:15,705 [INFO] - --------------------------------------------------
+2025-06-05 18:23:15,705 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_056.json
+2025-06-05 18:23:15,705 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_056.json
+2025-06-05 18:23:35,476 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_056.json (耗时: 19.77 秒)
+2025-06-05 18:23:35,476 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_056.mp4
+
+2025-06-05 18:23:35,476 [INFO] - --------------------------------------------------
+2025-06-05 18:23:35,476 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_057.json
+2025-06-05 18:23:35,476 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_057.json
+2025-06-05 18:26:57,200 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_057.json (耗时: 201.72 秒)
+2025-06-05 18:26:57,200 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_057.mp4
+
+2025-06-05 18:26:57,200 [INFO] - --------------------------------------------------
+2025-06-05 18:26:57,200 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_061.json
+2025-06-05 18:26:57,200 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_061.json
+2025-06-05 18:28:11,054 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_061.json (耗时: 73.85 秒)
+2025-06-05 18:28:11,055 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_061.mp4
+
+2025-06-05 18:28:11,055 [INFO] - --------------------------------------------------
+2025-06-05 18:28:11,055 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_062.json
+2025-06-05 18:28:11,055 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_062.json
+2025-06-05 18:30:00,358 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_062.json (耗时: 109.30 秒)
+2025-06-05 18:30:00,358 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_062.mp4
+
+2025-06-05 18:30:00,358 [INFO] - --------------------------------------------------
+2025-06-05 18:30:00,358 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_063.json
+2025-06-05 18:30:00,358 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_063.json
+2025-06-05 18:30:57,614 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_063.json (耗时: 57.26 秒)
+2025-06-05 18:30:57,614 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_063.mp4
+
+2025-06-05 18:30:57,614 [INFO] - --------------------------------------------------
+2025-06-05 18:30:57,614 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_064.json
+2025-06-05 18:30:57,614 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_064.json
+2025-06-05 18:32:04,082 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_064.json (耗时: 66.47 秒)
+2025-06-05 18:32:04,082 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_064.mp4
+
+2025-06-05 18:32:04,082 [INFO] - --------------------------------------------------
+2025-06-05 18:32:04,082 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_069.json
+2025-06-05 18:32:04,082 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_069.json
+2025-06-05 18:34:17,461 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_069.json (耗时: 133.38 秒)
+2025-06-05 18:34:17,461 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_069.mp4
+
+2025-06-05 18:34:17,461 [INFO] - --------------------------------------------------
+2025-06-05 18:34:17,461 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_070.json
+2025-06-05 18:34:17,461 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_070.json
+2025-06-05 18:35:16,289 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_070.json (耗时: 58.83 秒)
+2025-06-05 18:35:16,290 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_070.mp4
+
+2025-06-05 18:35:16,290 [INFO] - --------------------------------------------------
+2025-06-05 18:35:16,290 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_073.json
+2025-06-05 18:35:16,290 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_073.json
+2025-06-05 18:36:04,605 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_073.json (耗时: 48.32 秒)
+2025-06-05 18:36:04,605 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_073.mp4
+
+2025-06-05 18:36:04,605 [INFO] - --------------------------------------------------
+2025-06-05 18:36:04,605 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_077.json
+2025-06-05 18:36:04,605 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_077.json
+2025-06-05 18:36:29,003 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_077.json (耗时: 24.40 秒)
+2025-06-05 18:36:29,003 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_077.mp4
+
+2025-06-05 18:36:29,003 [INFO] - --------------------------------------------------
+2025-06-05 18:36:29,003 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_079.json
+2025-06-05 18:36:29,003 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_079.json
+2025-06-05 18:36:49,404 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_079.json (耗时: 20.40 秒)
+2025-06-05 18:36:49,404 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_079.mp4
+
+2025-06-05 18:36:49,405 [INFO] - --------------------------------------------------
+2025-06-05 18:36:49,405 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_081.json
+2025-06-05 18:36:49,405 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_081.json
+2025-06-05 18:37:19,288 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_081.json (耗时: 29.88 秒)
+2025-06-05 18:37:19,288 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_081.mp4
+
+2025-06-05 18:37:19,288 [INFO] - --------------------------------------------------
+2025-06-05 18:37:19,288 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_082.json
+2025-06-05 18:37:19,288 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_082.json
+2025-06-05 18:37:21,744 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_082.json (耗时: 2.46 秒)
+2025-06-05 18:37:21,744 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_082.mp4
+
+2025-06-05 18:37:21,744 [INFO] - --------------------------------------------------
+2025-06-05 18:37:21,744 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_085.json
+2025-06-05 18:37:21,744 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_085.json
+2025-06-05 18:38:42,729 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_085.json (耗时: 80.98 秒)
+2025-06-05 18:38:42,729 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_085.mp4
+
+2025-06-05 18:38:42,729 [INFO] - --------------------------------------------------
+2025-06-05 18:38:42,729 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_086.json
+2025-06-05 18:38:42,729 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_086.json
+2025-06-05 18:38:54,353 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_086.json (耗时: 11.62 秒)
+2025-06-05 18:38:54,353 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_086.mp4
+
+2025-06-05 18:38:54,353 [INFO] - --------------------------------------------------
+2025-06-05 18:38:54,353 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_091.json
+2025-06-05 18:38:54,353 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_091.json
+2025-06-05 18:39:59,877 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_091.json (耗时: 65.52 秒)
+2025-06-05 18:39:59,877 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_091.mp4
+
+2025-06-05 18:39:59,877 [INFO] - --------------------------------------------------
+2025-06-05 18:39:59,877 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_094.json
+2025-06-05 18:39:59,877 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_094.json
+2025-06-05 18:41:30,103 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_094.json (耗时: 90.23 秒)
+2025-06-05 18:41:30,103 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_094.mp4
+
+2025-06-05 18:41:30,103 [INFO] - --------------------------------------------------
+2025-06-05 18:41:30,103 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_099.json
+2025-06-05 18:41:30,103 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_099.json
+2025-06-05 18:43:21,680 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_099.json (耗时: 111.58 秒)
+2025-06-05 18:43:21,680 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_099.mp4
+
+2025-06-05 18:43:21,680 [INFO] - --------------------------------------------------
+2025-06-05 18:43:21,680 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_101.json
+2025-06-05 18:43:21,680 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_101.json
+2025-06-05 18:44:08,732 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_101.json (耗时: 47.05 秒)
+2025-06-05 18:44:08,732 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_101.mp4
+
+2025-06-05 18:44:08,732 [INFO] - --------------------------------------------------
+2025-06-05 18:44:08,732 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_105.json
+2025-06-05 18:44:08,732 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_105.json
+2025-06-05 18:46:31,305 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_105.json (耗时: 142.57 秒)
+2025-06-05 18:46:31,305 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_105.mp4
+
+2025-06-05 18:46:31,305 [INFO] - --------------------------------------------------
+2025-06-05 18:46:31,306 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_111.json
+2025-06-05 18:46:31,306 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_111.json
+2025-06-05 18:48:10,900 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_111.json (耗时: 99.59 秒)
+2025-06-05 18:48:10,900 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_111.mp4
+
+2025-06-05 18:48:10,900 [INFO] - --------------------------------------------------
+2025-06-05 18:48:10,900 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_114.json
+2025-06-05 18:48:10,900 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_114.json
+2025-06-05 18:49:14,480 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_114.json (耗时: 63.58 秒)
+2025-06-05 18:49:14,480 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_114.mp4
+
+2025-06-05 18:49:14,480 [INFO] - --------------------------------------------------
+2025-06-05 18:49:14,480 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_116.json
+2025-06-05 18:49:14,480 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_116.json
+2025-06-05 18:50:32,987 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_116.json (耗时: 78.51 秒)
+2025-06-05 18:50:32,987 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_116.mp4
+
+2025-06-05 18:50:32,987 [INFO] - --------------------------------------------------
+2025-06-05 18:50:32,987 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_117.json
+2025-06-05 18:50:32,987 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_117.json
+2025-06-05 18:52:41,719 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_117.json (耗时: 128.73 秒)
+2025-06-05 18:52:41,719 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_117.mp4
+
+2025-06-05 18:52:41,719 [INFO] - --------------------------------------------------
+2025-06-05 18:52:41,719 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_119.json
+2025-06-05 18:52:41,719 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_119.json
+2025-06-05 18:54:46,493 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_119.json (耗时: 124.77 秒)
+2025-06-05 18:54:46,493 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_119.mp4
+
+2025-06-05 18:54:46,493 [INFO] - --------------------------------------------------
+2025-06-05 18:54:46,493 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_120.json
+2025-06-05 18:54:46,493 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_120.json
+2025-06-05 18:56:03,535 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_120.json (耗时: 77.04 秒)
+2025-06-05 18:56:03,536 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_120.mp4
+
+2025-06-05 18:56:03,536 [INFO] - --------------------------------------------------
+2025-06-05 18:56:03,536 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_121.json
+2025-06-05 18:56:03,536 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_121.json
+2025-06-05 18:56:28,219 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_121.json (耗时: 24.68 秒)
+2025-06-05 18:56:28,220 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_121.mp4
+
+2025-06-05 18:56:28,220 [INFO] - --------------------------------------------------
+2025-06-05 18:56:28,220 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_122.json
+2025-06-05 18:56:28,220 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_122.json
+2025-06-05 18:56:41,146 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_122.json (耗时: 12.93 秒)
+2025-06-05 18:56:41,146 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_122.mp4
+
+2025-06-05 18:56:41,146 [INFO] - --------------------------------------------------
+2025-06-05 18:56:41,147 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_123.json
+2025-06-05 18:56:41,147 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_123.json
+2025-06-05 18:57:13,942 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_123.json (耗时: 32.80 秒)
+2025-06-05 18:57:13,943 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_123.mp4
+
+2025-06-05 18:57:13,943 [INFO] - --------------------------------------------------
+2025-06-05 18:57:13,943 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_124.json
+2025-06-05 18:57:13,943 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_124.json
+2025-06-05 19:00:47,147 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_124.json (耗时: 213.20 秒)
+2025-06-05 19:00:47,147 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_124.mp4
+
+2025-06-05 19:00:47,147 [INFO] - --------------------------------------------------
+2025-06-05 19:00:47,147 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_128.json
+2025-06-05 19:00:47,147 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_128.json
+2025-06-05 19:02:16,808 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_128.json (耗时: 89.66 秒)
+2025-06-05 19:02:16,808 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_128.mp4
+
+2025-06-05 19:02:16,808 [INFO] - --------------------------------------------------
+2025-06-05 19:02:16,808 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_131.json
+2025-06-05 19:02:16,808 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_131.json
+2025-06-05 19:04:13,779 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_131.json (耗时: 116.97 秒)
+2025-06-05 19:04:13,780 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_131.mp4
+
+2025-06-05 19:04:13,780 [INFO] - --------------------------------------------------
+2025-06-05 19:04:13,780 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_132.json
+2025-06-05 19:04:13,780 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_132.json
+2025-06-05 19:06:21,461 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_132.json (耗时: 127.68 秒)
+2025-06-05 19:06:21,461 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_132.mp4
+
+2025-06-05 19:06:21,461 [INFO] - --------------------------------------------------
+2025-06-05 19:06:21,461 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_133.json
+2025-06-05 19:06:21,462 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_133.json
+2025-06-05 19:06:24,632 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_133.json (耗时: 3.17 秒)
+2025-06-05 19:06:24,632 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_133.mp4
+
+2025-06-05 19:06:24,632 [INFO] - --------------------------------------------------
+2025-06-05 19:06:24,632 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_137.json
+2025-06-05 19:06:24,632 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_137.json
+2025-06-05 19:08:40,466 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_137.json (耗时: 135.83 秒)
+2025-06-05 19:08:40,466 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_137.mp4
+
+2025-06-05 19:08:40,466 [INFO] - --------------------------------------------------
+2025-06-05 19:08:40,466 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_141.json
+2025-06-05 19:08:40,466 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_141.json
+2025-06-05 19:08:42,935 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_141.json (耗时: 2.47 秒)
+2025-06-05 19:08:42,935 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_141.mp4
+
+2025-06-05 19:08:42,935 [INFO] - --------------------------------------------------
+2025-06-05 19:08:42,935 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_147.json
+2025-06-05 19:08:42,935 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_147.json
+2025-06-05 19:10:13,415 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_147.json (耗时: 90.48 秒)
+2025-06-05 19:10:13,415 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_147.mp4
+
+2025-06-05 19:10:13,415 [INFO] - --------------------------------------------------
+2025-06-05 19:10:13,415 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_153.json
+2025-06-05 19:10:13,415 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_153.json
+2025-06-05 19:10:15,370 [ERROR] - 失败: backend/data/samples/mvs_json/sample_math_problem_153.json (返回码: 1, 耗时: 1.95 秒)
+2025-06-05 19:10:15,370 [ERROR] -   错误信息:
+2025-06-05 19:10:13.471 | INFO     | __main__:main:42 - 开始处理JSON文件: backend/data/samples/mvs_json/sample_math_problem_153.json
+2025-06-05 19:10:13.472 | INFO     | backend.src.video_composer:main:770 - 步骤1: 生成音频片段
+2025-06-05 19:10:13.472 | INFO     | backend.src.video_composer:run_command:71 - 执行命令: /home/jay/DogMath/venv/bin/python backend/src/audio_generator/example.py --segmented backend/data/samples/mvs_json/sample_math_problem_153.json backend/output/audio_segments
+2025-06-05 19:10:15.360 | DEBUG    | backend.src.video_composer:run_command:86 - 命令标准错误/日志 (stderr):
+2025-06-05 19:10:13.523 | INFO     | backend.src.audio_generator.text_to_speech_google:<module>:22 - 已加载 config.py 配置文件
+2025-06-05 19:10:13.617 | INFO     | backend.src.audio_generator.text_to_speech_volcano:<module>:19 - 已加载 config.py 配置文件
+2025-06-05 19:10:13.622 | INFO     | backend.src.audio_generator.text_to_speech_google:__init__:68 - 使用服务账号文件认证: /home/jay/DogMath/backend/src/audio_generator/swift-radar-457602-u4-0ee8fbcefb01.json
+2025-06-05 19:10:13.691 | INFO     | backend.src.audio_generator.text_to_speech_volcano:__init__:74 - 火山引擎 TTS 初始化完成，默认音色: BV001_streaming; cluster: volcano_tts
+2025-06-05 19:10:13.692 | INFO     | backend.src.audio_generator.language_router_tts:__init__:69 - 语言路由TTS初始化完成
+2025-06-05 19:10:13.692 | INFO     | __main__:generate_segmented_audio:181 - 正在生成音频片段 1/14
+2025-06-05 19:10:13.693 | DEBUG    | backend.src.audio_generator.language_router_tts:_is_chinese_text:95 - 文本中文字符占比: 0.67
+2025-06-05 19:10:13.693 | INFO     | backend.src.audio_generator.language_router_tts:_get_tts_engine:110 - 检测到中文文本，使用火山引擎TTS
+2025-06-05 19:10:14.576 | INFO     | backend.src.audio_generator.text_to_speech_volcano:synthesize_speech:149 - 音频已保存: backend/output/audio_segments/audio_0_0.wav
+2025-06-05 19:10:14.579 | INFO     | __main__:generate_segmented_audio:181 - 正在生成音频片段 2/14
+2025-06-05 19:10:14.579 | DEBUG    | backend.src.audio_generator.language_router_tts:_is_chinese_text:95 - 文本中文字符占比: 0.89
+2025-06-05 19:10:14.580 | INFO     | backend.src.audio_generator.language_router_tts:_get_tts_engine:110 - 检测到中文文本，使用火山引擎TTS
+2025-06-05 19:10:15.056 | INFO     | backend.src.audio_generator.text_to_speech_volcano:synthesize_speech:149 - 音频已保存: backend/output/audio_segments/audio_4000_1.wav
+2025-06-05 19:10:15.059 | INFO     | __main__:generate_segmented_audio:181 - 正在生成音频片段 3/14
+2025-06-05 19:10:15.060 | DEBUG    | backend.src.audio_generator.language_router_tts:_is_chinese_text:95 - 文本中文字符占比: 0.81
+2025-06-05 19:10:15.060 | INFO     | backend.src.audio_generator.language_router_tts:_get_tts_engine:110 - 检测到中文文本，使用火山引擎TTS
+2025-06-05 19:10:15.319 | ERROR    | backend.src.audio_generator.text_to_speech_volcano:synthesize_speech:137 - TTS HTTP 400 — illegal input text!
+2025-06-05 19:10:15.320 | ERROR    | __main__:generate_segmented_audio:219 - 音频生成失败: 400 Client Error: Bad Request for url: https://openspeech.bytedance.com/api/v1/tts
+Traceback (most recent call last):
+  File "/home/jay/DogMath/backend/src/audio_generator/example.py", line 258, in <module>
+    audio_segments = generate_segmented_audio(json_path, output_dir)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jay/DogMath/backend/src/audio_generator/example.py", line 189, in generate_segmented_audio
+    audio_file = tts.synthesize_speech(
+                 ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jay/DogMath/backend/src/audio_generator/language_router_tts.py", line 139, in synthesize_speech
+    return tts_engine.synthesize_speech(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jay/DogMath/backend/src/audio_generator/text_to_speech_volcano.py", line 138, in synthesize_speech
+    resp.raise_for_status()
+  File "/home/jay/DogMath/venv/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://openspeech.bytedance.com/api/v1/tts
+2025-06-05 19:10:15.361 | ERROR    | backend.src.video_composer:run_command:90 - 命令执行失败，返回码: 1
+2025-06-05 19:10:15.361 | ERROR    | backend.src.video_composer:generate_audio_segments:150 - 音频片段生成失败
+2025-06-05 19:10:15.361 | ERROR    | backend.src.video_composer:main:773 - 音频片段生成失败，终止
+2025-06-05 19:10:15.361 | ERROR    | __main__:main:59 - 视频生成失败，未找到输出文件: backend/output/sample_math_problem_153.mp4
+
+2025-06-05 19:10:15,370 [INFO] -   输出 (可能包含错误信息):
+错误：视频生成失败，未找到输出文件: backend/output/sample_math_problem_153.mp4
+
+2025-06-05 19:10:15,370 [INFO] - --------------------------------------------------
+2025-06-05 19:10:15,370 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_159.json
+2025-06-05 19:10:15,370 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_159.json
+2025-06-05 19:14:12,346 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_159.json (耗时: 236.98 秒)
+2025-06-05 19:14:12,346 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_159.mp4
+
+2025-06-05 19:14:12,346 [INFO] - --------------------------------------------------
+2025-06-05 19:14:12,346 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_160.json
+2025-06-05 19:14:12,346 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_160.json
+2025-06-05 19:14:48,942 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_160.json (耗时: 36.60 秒)
+2025-06-05 19:14:48,943 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_160.mp4
+
+2025-06-05 19:14:48,943 [INFO] - --------------------------------------------------
+2025-06-05 19:14:48,943 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_162.json
+2025-06-05 19:14:48,943 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_162.json
+2025-06-05 19:16:16,212 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_162.json (耗时: 87.27 秒)
+2025-06-05 19:16:16,212 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_162.mp4
+
+2025-06-05 19:16:16,212 [INFO] - --------------------------------------------------
+2025-06-05 19:16:16,212 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_163.json
+2025-06-05 19:16:16,212 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_163.json
+2025-06-05 19:18:30,452 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_163.json (耗时: 134.24 秒)
+2025-06-05 19:18:30,452 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_163.mp4
+
+2025-06-05 19:18:30,452 [INFO] - --------------------------------------------------
+2025-06-05 19:18:30,452 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_164.json
+2025-06-05 19:18:30,452 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_164.json
+2025-06-05 19:19:50,265 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_164.json (耗时: 79.81 秒)
+2025-06-05 19:19:50,265 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_164.mp4
+
+2025-06-05 19:19:50,265 [INFO] - --------------------------------------------------
+2025-06-05 19:19:50,266 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_165.json
+2025-06-05 19:19:50,266 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_165.json
+2025-06-05 19:20:01,840 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_165.json (耗时: 11.57 秒)
+2025-06-05 19:20:01,840 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_165.mp4
+
+2025-06-05 19:20:01,840 [INFO] - --------------------------------------------------
+2025-06-05 19:20:01,840 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_166.json
+2025-06-05 19:20:01,840 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_166.json
+2025-06-05 19:21:27,237 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_166.json (耗时: 85.40 秒)
+2025-06-05 19:21:27,237 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_166.mp4
+
+2025-06-05 19:21:27,237 [INFO] - --------------------------------------------------
+2025-06-05 19:21:27,237 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_167.json
+2025-06-05 19:21:27,237 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_167.json
+2025-06-05 19:22:40,811 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_167.json (耗时: 73.57 秒)
+2025-06-05 19:22:40,811 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_167.mp4
+
+2025-06-05 19:22:40,811 [INFO] - --------------------------------------------------
+2025-06-05 19:22:40,811 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_169.json
+2025-06-05 19:22:40,811 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_169.json
+2025-06-05 19:24:23,657 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_169.json (耗时: 102.85 秒)
+2025-06-05 19:24:23,657 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_169.mp4
+
+2025-06-05 19:24:23,657 [INFO] - --------------------------------------------------
+2025-06-05 19:24:23,657 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_170.json
+2025-06-05 19:24:23,657 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_170.json
+2025-06-05 19:26:26,955 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_170.json (耗时: 123.30 秒)
+2025-06-05 19:26:26,955 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_170.mp4
+
+2025-06-05 19:26:26,955 [INFO] - --------------------------------------------------
+2025-06-05 19:26:26,956 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_172.json
+2025-06-05 19:26:26,956 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_172.json
+2025-06-05 19:27:32,542 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_172.json (耗时: 65.59 秒)
+2025-06-05 19:27:32,542 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_172.mp4
+
+2025-06-05 19:27:32,542 [INFO] - --------------------------------------------------
+2025-06-05 19:27:32,542 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_175.json
+2025-06-05 19:27:32,542 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_175.json
+2025-06-05 19:30:18,584 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_175.json (耗时: 166.04 秒)
+2025-06-05 19:30:18,584 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_175.mp4
+
+2025-06-05 19:30:18,584 [INFO] - --------------------------------------------------
+2025-06-05 19:30:18,584 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_179.json
+2025-06-05 19:30:18,584 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_179.json
+2025-06-05 19:31:36,301 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_179.json (耗时: 77.72 秒)
+2025-06-05 19:31:36,301 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_179.mp4
+
+2025-06-05 19:31:36,301 [INFO] - --------------------------------------------------
+2025-06-05 19:31:36,301 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_180.json
+2025-06-05 19:31:36,301 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_180.json
+2025-06-05 19:32:40,691 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_180.json (耗时: 64.39 秒)
+2025-06-05 19:32:40,691 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_180.mp4
+
+2025-06-05 19:32:40,691 [INFO] - --------------------------------------------------
+2025-06-05 19:32:40,691 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_181.json
+2025-06-05 19:32:40,691 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_181.json
+2025-06-05 19:40:35,285 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_181.json (耗时: 474.59 秒)
+2025-06-05 19:40:35,285 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_181.mp4
+
+2025-06-05 19:40:35,285 [INFO] - --------------------------------------------------
+2025-06-05 19:40:35,285 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_186.json
+2025-06-05 19:40:35,285 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_186.json
+2025-06-05 19:41:33,466 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_186.json (耗时: 58.18 秒)
+2025-06-05 19:41:33,466 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_186.mp4
+
+2025-06-05 19:41:33,466 [INFO] - --------------------------------------------------
+2025-06-05 19:41:33,466 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_190.json
+2025-06-05 19:41:33,467 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_190.json
+2025-06-05 19:42:46,373 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_190.json (耗时: 72.91 秒)
+2025-06-05 19:42:46,373 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_190.mp4
+
+2025-06-05 19:42:46,373 [INFO] - --------------------------------------------------
+2025-06-05 19:42:46,373 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_191.json
+2025-06-05 19:42:46,373 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_191.json
+2025-06-05 19:43:31,221 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_191.json (耗时: 44.85 秒)
+2025-06-05 19:43:31,221 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_191.mp4
+
+2025-06-05 19:43:31,221 [INFO] - --------------------------------------------------
+2025-06-05 19:43:31,221 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_195.json
+2025-06-05 19:43:31,221 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_195.json
+2025-06-05 19:44:37,254 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_195.json (耗时: 66.03 秒)
+2025-06-05 19:44:37,254 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_195.mp4
+
+2025-06-05 19:44:37,255 [INFO] - --------------------------------------------------
+2025-06-05 19:44:37,255 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_196.json
+2025-06-05 19:44:37,255 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_196.json
+2025-06-05 19:46:35,839 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_196.json (耗时: 118.58 秒)
+2025-06-05 19:46:35,839 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_196.mp4
+
+2025-06-05 19:46:35,839 [INFO] - --------------------------------------------------
+2025-06-05 19:46:35,839 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_197.json
+2025-06-05 19:46:35,839 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_197.json
+2025-06-05 19:47:54,803 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_197.json (耗时: 78.96 秒)
+2025-06-05 19:47:54,804 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_197.mp4
+
+2025-06-05 19:47:54,804 [INFO] - --------------------------------------------------
+2025-06-05 19:47:54,804 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_201.json
+2025-06-05 19:47:54,804 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_201.json
+2025-06-05 19:50:49,367 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_201.json (耗时: 174.56 秒)
+2025-06-05 19:50:49,367 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_201.mp4
+
+2025-06-05 19:50:49,367 [INFO] - --------------------------------------------------
+2025-06-05 19:50:49,367 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_203.json
+2025-06-05 19:50:49,367 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_203.json
+2025-06-05 19:53:04,308 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_203.json (耗时: 134.94 秒)
+2025-06-05 19:53:04,308 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_203.mp4
+
+2025-06-05 19:53:04,308 [INFO] - --------------------------------------------------
+2025-06-05 19:53:04,308 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_205.json
+2025-06-05 19:53:04,308 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_205.json
+2025-06-05 19:53:07,505 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_205.json (耗时: 3.20 秒)
+2025-06-05 19:53:07,505 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_205.mp4
+
+2025-06-05 19:53:07,505 [INFO] - --------------------------------------------------
+2025-06-05 19:53:07,505 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_207.json
+2025-06-05 19:53:07,505 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_207.json
+2025-06-05 19:53:46,019 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_207.json (耗时: 38.51 秒)
+2025-06-05 19:53:46,019 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_207.mp4
+
+2025-06-05 19:53:46,019 [INFO] - --------------------------------------------------
+2025-06-05 19:53:46,019 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_210.json
+2025-06-05 19:53:46,019 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_210.json
+2025-06-05 19:54:46,392 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_210.json (耗时: 60.37 秒)
+2025-06-05 19:54:46,393 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_210.mp4
+
+2025-06-05 19:54:46,393 [INFO] - --------------------------------------------------
+2025-06-05 19:54:46,393 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_212.json
+2025-06-05 19:54:46,393 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_212.json
+2025-06-05 19:56:29,297 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_212.json (耗时: 102.90 秒)
+2025-06-05 19:56:29,297 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_212.mp4
+
+2025-06-05 19:56:29,297 [INFO] - --------------------------------------------------
+2025-06-05 19:56:29,297 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_214.json
+2025-06-05 19:56:29,297 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_214.json
+2025-06-05 19:58:25,611 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_214.json (耗时: 116.31 秒)
+2025-06-05 19:58:25,611 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_214.mp4
+
+2025-06-05 19:58:25,611 [INFO] - --------------------------------------------------
+2025-06-05 19:58:25,611 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_218.json
+2025-06-05 19:58:25,611 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_218.json
+2025-06-05 19:58:39,224 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_218.json (耗时: 13.61 秒)
+2025-06-05 19:58:39,224 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_218.mp4
+
+2025-06-05 19:58:39,224 [INFO] - --------------------------------------------------
+2025-06-05 19:58:39,224 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_220.json
+2025-06-05 19:58:39,224 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_220.json
+2025-06-05 20:01:36,344 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_220.json (耗时: 177.12 秒)
+2025-06-05 20:01:36,345 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_220.mp4
+
+2025-06-05 20:01:36,345 [INFO] - --------------------------------------------------
+2025-06-05 20:01:36,345 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_223.json
+2025-06-05 20:01:36,345 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_223.json
+2025-06-05 20:04:23,865 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_223.json (耗时: 167.52 秒)
+2025-06-05 20:04:23,865 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_223.mp4
+
+2025-06-05 20:04:23,865 [INFO] - --------------------------------------------------
+2025-06-05 20:04:23,865 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_226.json
+2025-06-05 20:04:23,865 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_226.json
+2025-06-05 20:05:31,061 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_226.json (耗时: 67.20 秒)
+2025-06-05 20:05:31,061 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_226.mp4
+
+2025-06-05 20:05:31,061 [INFO] - --------------------------------------------------
+2025-06-05 20:05:31,061 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_227.json
+2025-06-05 20:05:31,061 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_227.json
+2025-06-05 20:06:46,558 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_227.json (耗时: 75.50 秒)
+2025-06-05 20:06:46,558 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_227.mp4
+
+2025-06-05 20:06:46,558 [INFO] - --------------------------------------------------
+2025-06-05 20:06:46,558 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_228.json
+2025-06-05 20:06:46,558 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_228.json
+2025-06-05 20:09:38,401 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_228.json (耗时: 171.84 秒)
+2025-06-05 20:09:38,401 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_228.mp4
+
+2025-06-05 20:09:38,401 [INFO] - --------------------------------------------------
+2025-06-05 20:09:38,401 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_229.json
+2025-06-05 20:09:38,401 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_229.json
+2025-06-05 20:09:41,280 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_229.json (耗时: 2.88 秒)
+2025-06-05 20:09:41,280 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_229.mp4
+
+2025-06-05 20:09:41,280 [INFO] - --------------------------------------------------
+2025-06-05 20:09:41,281 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_230.json
+2025-06-05 20:09:41,281 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_230.json
+2025-06-05 20:11:17,907 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_230.json (耗时: 96.63 秒)
+2025-06-05 20:11:17,907 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_230.mp4
+
+2025-06-05 20:11:17,907 [INFO] - --------------------------------------------------
+2025-06-05 20:11:17,907 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_232.json
+2025-06-05 20:11:17,907 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_232.json
+2025-06-05 20:14:18,664 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_232.json (耗时: 180.76 秒)
+2025-06-05 20:14:18,664 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_232.mp4
+
+2025-06-05 20:14:18,664 [INFO] - --------------------------------------------------
+2025-06-05 20:14:18,664 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_235.json
+2025-06-05 20:14:18,664 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_235.json
+2025-06-05 20:14:53,130 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_235.json (耗时: 34.47 秒)
+2025-06-05 20:14:53,130 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_235.mp4
+
+2025-06-05 20:14:53,130 [INFO] - --------------------------------------------------
+2025-06-05 20:14:53,130 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_237.json
+2025-06-05 20:14:53,130 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_237.json
+2025-06-05 20:16:29,463 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_237.json (耗时: 96.33 秒)
+2025-06-05 20:16:29,463 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_237.mp4
+
+2025-06-05 20:16:29,463 [INFO] - --------------------------------------------------
+2025-06-05 20:16:29,463 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_238.json
+2025-06-05 20:16:29,463 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_238.json
+2025-06-05 20:18:04,653 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_238.json (耗时: 95.19 秒)
+2025-06-05 20:18:04,653 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_238.mp4
+
+2025-06-05 20:18:04,653 [INFO] - --------------------------------------------------
+2025-06-05 20:18:04,653 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_242.json
+2025-06-05 20:18:04,653 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_242.json
+2025-06-05 20:20:33,073 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_242.json (耗时: 148.42 秒)
+2025-06-05 20:20:33,073 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_242.mp4
+
+2025-06-05 20:20:33,073 [INFO] - --------------------------------------------------
+2025-06-05 20:20:33,073 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_243.json
+2025-06-05 20:20:33,073 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_243.json
+2025-06-05 20:21:14,105 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_243.json (耗时: 41.03 秒)
+2025-06-05 20:21:14,105 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_243.mp4
+
+2025-06-05 20:21:14,105 [INFO] - --------------------------------------------------
+2025-06-05 20:21:14,105 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_246.json
+2025-06-05 20:21:14,105 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_246.json
+2025-06-05 20:22:36,768 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_246.json (耗时: 82.66 秒)
+2025-06-05 20:22:36,768 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_246.mp4
+
+2025-06-05 20:22:36,768 [INFO] - --------------------------------------------------
+2025-06-05 20:22:36,768 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_250.json
+2025-06-05 20:22:36,768 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_250.json
+2025-06-05 20:23:18,635 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_250.json (耗时: 41.87 秒)
+2025-06-05 20:23:18,635 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_250.mp4
+
+2025-06-05 20:23:18,635 [INFO] - --------------------------------------------------
+2025-06-05 20:23:18,635 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_251.json
+2025-06-05 20:23:18,635 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_251.json
+2025-06-05 20:24:00,015 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_251.json (耗时: 41.38 秒)
+2025-06-05 20:24:00,015 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_251.mp4
+
+2025-06-05 20:24:00,015 [INFO] - --------------------------------------------------
+2025-06-05 20:24:00,015 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_252.json
+2025-06-05 20:24:00,016 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_252.json
+2025-06-05 20:25:15,824 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_252.json (耗时: 75.81 秒)
+2025-06-05 20:25:15,825 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_252.mp4
+
+2025-06-05 20:25:15,825 [INFO] - --------------------------------------------------
+2025-06-05 20:25:15,825 [INFO] - 找到文件: backend/data/samples/mvs_json/sample_math_problem_257.json
+2025-06-05 20:25:15,825 [INFO] - 开始处理: backend/data/samples/mvs_json/sample_math_problem_257.json
+2025-06-05 20:27:32,422 [INFO] - 成功: backend/data/samples/mvs_json/sample_math_problem_257.json (耗时: 136.60 秒)
+2025-06-05 20:27:32,422 [INFO] -   输出:
+视频生成成功: backend/output/sample_math_problem_257.mp4
+
+2025-06-05 20:27:32,422 [INFO] - --------------------------------------------------
+2025-06-05 20:27:32,422 [INFO] - 视频批量生成完成.
+2025-06-05 20:27:32,422 [INFO] - 总共检查文件数 (在指定范围内): 253
+2025-06-05 20:27:32,422 [INFO] - 实际找到并尝试处理的文件数: 105
+2025-06-05 20:27:32,422 [INFO] - 成功生成视频的文件数: 105
+2025-06-05 20:27:32,422 [INFO] - 总耗时: 10087.63 秒

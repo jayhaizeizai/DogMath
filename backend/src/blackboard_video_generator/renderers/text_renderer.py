@@ -94,7 +94,7 @@ def render_text_as_image(text, font_size, debug=False):
                    transform=ax.transAxes,
                    family=chinese_font,
                    usetex=False,          # 明确关闭 LaTeX
-                   parse_math=True)      # 关闭 mathtext（≥3.8）
+                   parse_math=False)      # 正确：关闭 mathtext
         else:
             # 如果没有找到合适的中文字体，尝试用sans-serif字体族
             ax.text(0.5, 0.5, text, 
@@ -104,7 +104,7 @@ def render_text_as_image(text, font_size, debug=False):
                    transform=ax.transAxes,
                    family='sans-serif',
                    usetex=False,          # 明确关闭 LaTeX
-                   parse_math=True)      # 关闭 mathtext（≥3.8）
+                   parse_math=False)      # 正确：关闭 mathtext
             if debug and any('\u4e00' <= c <= '\u9fff' for c in text):
                 logger.warning("未找到中文字体，使用sans-serif族")
         

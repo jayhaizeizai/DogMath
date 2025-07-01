@@ -256,7 +256,8 @@ class BlackboardVideoGenerator:
                     if element['type'] == 'formula':
                         img = render_formula(element['content'], element.get('font_size', 32), self.debug)
                     elif element['type'] == 'text':
-                        img = render_text(element['content'], element.get('font_size', 32), self.debug)
+                        # 文本也可能包含LaTeX公式，所以统一使用 render_formula
+                        img = render_formula(element['content'], element.get('font_size', 32), self.debug)
                     elif element['type'] == 'geometry':
                         img = render_geometry(element['content'], scale_factor=element.get('scale', 1.0), debug=self.debug)
                     

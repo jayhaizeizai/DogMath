@@ -156,6 +156,18 @@ def render_formula(formula, font_size, debug=False):
     try:
         logger.info(f"渲染公式: {formula}, 字体大小: {font_size}")
         
+        # *** 关键修复：在处理之前，先处理中文标点被错误包含在$...$中的问题 ***
+        # 使用正则表达式将类似 "$...$。" 的模式修正为 "$...$ 。"
+        punctuation_pattern = r'(\$[^$]*?)([。，！？；：])\$'
+        formula = re.sub(punctuation_pattern, r'\1$\2', formula)
+        
+        # 同时处理 "$...[标点]$" 的情况
+        punctuation_pattern2 = r'\$([^$]*?)([。，！？；：])\$'
+        formula = re.sub(punctuation_pattern2, r'$\1$ \2', formula)
+        
+        if debug:
+            logger.info(f"标点修正后的公式: {formula}")
+        
         max_width_screen = 1920
         # 使用与 render_latex_as_image 中一致的右侧安全因子，尽管最终缩放由 blackboard_video_generator 控制，
         # 但这里可以用于指导单个元素渲染时的最大期望宽度。
