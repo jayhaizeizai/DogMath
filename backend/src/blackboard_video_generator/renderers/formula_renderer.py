@@ -236,7 +236,11 @@ def render_formula(formula, font_size, debug=False):
                     if img_part is None or img_part.shape[0] == 0 or img_part.shape[1] == 0:
                         continue
                     h_part, w_part = img_part.shape[:2]
-                    y_offset = (max_parts_height - h_part) // 2
+                    # 智能对齐：矮片段（如标点）底对齐，高片段（如公式）居中对齐
+                    if h_part < 0.6 * max_parts_height:
+                        y_offset = max_parts_height - h_part  # 底对齐，让标点贴近基线
+                    else:
+                        y_offset = (max_parts_height - h_part) // 2  # 居中对齐
                     try:
                         combined_img[y_offset:y_offset+h_part, x_offset:x_offset+w_part] = img_part
                     except ValueError as e:
