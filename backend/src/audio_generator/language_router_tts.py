@@ -40,6 +40,7 @@ class LanguageRouterTTS:
         output_dir: Optional[str] = None,
         google_tts_params: Optional[Dict[str, Any]] = None,
         volcano_tts_params: Optional[Dict[str, Any]] = None,
+        preset_language: Optional[str] = None,  # 新增：预设语言类型 "chinese" | "english" | None
     ) -> None:
         """
         初始化语言路由TTS
@@ -48,9 +49,13 @@ class LanguageRouterTTS:
             output_dir: 输出目录
             google_tts_params: Google TTS参数
             volcano_tts_params: 火山引擎TTS参数
+            preset_language: 预设语言类型，"chinese"使用火山引擎，"english"使用Google TTS，None则自动检测
         """
         self.output_dir = Path(output_dir or os.path.join(os.getcwd(), "output", "audio"))
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 保存预设语言
+        self.preset_language = preset_language
         
         # 初始化Google TTS
         self.google_tts_params = google_tts_params or {}
@@ -66,7 +71,53 @@ class LanguageRouterTTS:
             **self.volcano_tts_params
         )
         
-        logger.info("语言路由TTS初始化完成")
+        if preset_language:
+            logger.info(f"语言路由TTS初始化完成，预设语言: {preset_language}")
+        else:
+            logger.info("语言路由TTS初始化完成，使用自动语言检测")
+    
+    @classmethod
+    def detect_language_from_json(cls, json_data: Dict[str, Any]) -> str:
+        """
+        从JSON数据整体判断语言类型
+        
+        Args:
+            json_data: 包含narration的JSON数据
+            
+        Returns:
+            "chinese" | "english"
+        """
+        audio_data = json_data.get('audio', {})
+        narration = audio_data.get('narration', [])
+        
+        if not narration:
+            logger.info("未找到narration数据，默认使用英文")
+            return "english"
+        
+        # 收集所有文本内容
+        all_text = ""
+        for item in narration:
+            if 'ssml' in item and item['ssml']:
+                # 移除SSML标签
+                clean_text = re.sub(r'<[^>]+>', '', item['ssml'])
+                all_text += clean_text + " "
+            elif 'text' in item and item['text']:
+                all_text += item['text'] + " "
+        
+        if not all_text.strip():
+            logger.info("未找到有效文本内容，默认使用英文")
+            return "english"
+        
+        # 计算中文字符占比
+        chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', all_text))
+        total_chars = len(all_text.strip())
+        
+        chinese_ratio = chinese_chars / total_chars if total_chars > 0 else 0
+        
+        detected_language = "chinese" if chinese_ratio >= CHINESE_THRESHOLD else "english"
+        logger.info(f"整体文本中文字符占比: {chinese_ratio:.2f}, 检测语言: {detected_language}")
+        
+        return detected_language
     
     def _is_chinese_text(self, text: str) -> bool:
         """
@@ -106,6 +157,15 @@ class LanguageRouterTTS:
         Returns:
             适合处理该文本的TTS引擎
         """
+        # 如果有预设语言，直接使用预设的引擎
+        if self.preset_language == "chinese":
+            logger.debug("使用预设中文TTS引擎（火山引擎）")
+            return self.volcano_tts
+        elif self.preset_language == "english":
+            logger.debug("使用预设英文TTS引擎（Google TTS）")
+            return self.google_tts
+        
+        # 否则按原来的逻辑判断
         if self._is_chinese_text(text):
             logger.info("检测到中文文本，使用火山引擎TTS")
             return self.volcano_tts

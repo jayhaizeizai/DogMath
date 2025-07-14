@@ -53,6 +53,10 @@ def generate_audio_from_json(json_path: str, output_path: str):
         with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             
+        # 先整体判断语言类型
+        language_type = LanguageRouterTTS.detect_language_from_json(data)
+        logger.info(f"检测到整体语言类型: {language_type}")
+        
         # 获取音频配置数据
         audio_data = data.get('audio', {})
         narration = audio_data.get('narration', [])
@@ -61,8 +65,8 @@ def generate_audio_from_json(json_path: str, output_path: str):
             logger.warning("没有找到旁白数据")
             return
             
-        # 创建TTS实例，会自动根据文本语言选择合适的TTS引擎
-        tts = LanguageRouterTTS()
+        # 使用预设语言创建TTS实例，避免每次都进行语言检测
+        tts = LanguageRouterTTS(preset_language=language_type)
         
         # 提取文本内容
         texts = []
@@ -79,7 +83,7 @@ def generate_audio_from_json(json_path: str, output_path: str):
             return
             
         # 生成音频
-        logger.info(f"开始生成音频，共{len(texts)}个片段")
+        logger.info(f"开始生成音频，共{len(texts)}个片段，使用{language_type}TTS引擎")
         
         # 确保输出目录存在
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -152,6 +156,10 @@ def generate_segmented_audio(json_path: str, output_dir: str) -> List[Dict[str, 
         # 读取JSON数据
         with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
+        
+        # 先整体判断语言类型
+        language_type = LanguageRouterTTS.detect_language_from_json(data)
+        logger.info(f"检测到整体语言类型: {language_type}")
             
         # 获取音频配置数据
         audio_data = data.get('audio', {})
@@ -161,8 +169,8 @@ def generate_segmented_audio(json_path: str, output_dir: str) -> List[Dict[str, 
             logger.warning("没有找到旁白数据")
             return []
             
-        # 创建TTS实例，会自动根据文本语言选择合适的TTS引擎
-        tts = LanguageRouterTTS()
+        # 使用预设语言创建TTS实例，避免每次都进行语言检测
+        tts = LanguageRouterTTS(preset_language=language_type)
         
         # 生成音频片段
         audio_segments = []
@@ -178,7 +186,7 @@ def generate_segmented_audio(json_path: str, output_dir: str) -> List[Dict[str, 
             output_path = os.path.join(output_dir, f"audio_{timestamp}_{idx}.wav")
             
             # 生成音频
-            logger.info(f"正在生成音频片段 {idx+1}/{len(narration)}")
+            logger.info(f"正在生成音频片段 {idx+1}/{len(narration)}，使用{language_type}TTS引擎")
             
             # 应用语音配置
             voice_config_data = segment.get('voice_config')
@@ -212,11 +220,11 @@ def generate_segmented_audio(json_path: str, output_dir: str) -> List[Dict[str, 
                 'end_time': actual_end_time
             })
             
-        logger.info(f"音频生成完成：共{len(audio_segments)}个片段")
+        logger.info(f"音频生成完成：共{len(audio_segments)}个片段，使用{language_type}TTS引擎")
         return audio_segments
         
     except Exception as e:
-        logger.error(f"音频生成失败: {str(e)}")
+        logger.error(f"分段音频生成失败: {str(e)}")
         raise
 
 if __name__ == '__main__':
